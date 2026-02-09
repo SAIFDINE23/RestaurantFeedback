@@ -127,21 +127,31 @@ class FeedbackRequestController extends Controller
                 ]);
             }
 
+            // 💳 Récupérer la subscription de la company
+            $company = Auth::user()->company;
+            $subscription = $company?->subscription;
+
             Log::info('SMS flow triggered', [
                 'customer_id' => $feedbackRequest->customer_id,
                 'phone' => $feedbackRequest->customer->phone,
+                'company_id' => $company?->id,
+                'subscription_id' => $subscription?->id,
             ]);
 
             try {
                 $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
 
-                $sms = app(SmsService::class)->send(
+                // 📱 Envoyer SMS avec vérification/consommation de crédits
+                $sms = app(SmsService::class)->sendWithCredits(
                     $feedbackRequest->customer->phone,
-                    "Bonjour 👋\nMerci de donner votre avis : " . $link
+                    "Bonjour 👋\nMerci de donner votre avis : " . $link,
+                    $subscription // Passer la subscription pour la gestion des crédits
                 );
 
-
-                Log::info('Brevo response', $sms);
+                Log::info('SMS sent and credits consumed', [
+                    'message_id' => $sms['messageId'] ?? null,
+                    'subscription_id' => $subscription?->id,
+                ]);
 
                 // 📦 Tracking provider
                 $feedbackRequest->update([
@@ -157,7 +167,7 @@ class FeedbackRequestController extends Controller
                     'status' => 'failed',
                 ]);
 
-                Log::error('Brevo SMS FAILED', [
+                Log::error('SMS FAILED', [
                     'to' => $feedbackRequest->customer->phone,
                     'error' => $e->getMessage(),
                 ]);
@@ -268,9 +278,15 @@ class FeedbackRequestController extends Controller
 
                     try {
                         $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
-                        $sms = app(SmsService::class)->send(
+                        
+                        // 💳 Utiliser sendWithCredits pour vérifier et consommer les crédits
+                        $company = Auth::user()->company;
+                        $subscription = $company?->subscription;
+                        
+                        $sms = app(SmsService::class)->sendWithCredits(
                             $feedbackRequest->customer->phone,
-                            "Bonjour 👋\nMerci de donner votre avis : " . $link
+                            "Bonjour 👋\nMerci de donner votre avis : " . $link,
+                            $subscription
                         );
 
                         $feedbackRequest->update([

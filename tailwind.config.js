@@ -28,9 +28,22 @@ export default {
                     800: '#554da2',
                     900: '#443b7f',
                 },
+                feedora: {
+                    50: '#fff5f5',
+                    100: '#ffe3e3',
+                    200: '#ffcac9',
+                    300: '#ffa7a5',
+                    400: '#ff8581',
+                    500: '#FF6F61', // Couleur principale
+                    600: '#e65549',
+                    700: '#cc3f33',
+                    800: '#a82f24',
+                    900: '#8a241a',
+                },
             },
             backgroundImage: {
                 'luminea-gradient': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'feedora-gradient': 'linear-gradient(135deg, #FF6F61 0%, #e65549 100%)',
             },
         },
     },

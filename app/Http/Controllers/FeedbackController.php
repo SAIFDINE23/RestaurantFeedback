@@ -56,7 +56,7 @@ class FeedbackController extends Controller
             ->where('token', $token)
             ->firstOrFail();
 
-        if ($feedbackRequest->status === 'completed') {
+        if (in_array($feedbackRequest->status, ['completed', 'expired'], true)) {
             return Inertia::render('Feedback/AlreadySubmitted', [
                 'company' => $feedbackRequest->company->name,
             ]);
@@ -101,7 +101,7 @@ class FeedbackController extends Controller
 
         $feedbackRequest = FeedbackRequest::with('company')
             ->where('token', $token)
-            ->where('status', '!=', 'completed')
+            ->whereNotIn('status', ['completed', 'expired'])
             ->firstOrFail();
 
         // ✅ Création du feedback
@@ -128,20 +128,39 @@ class FeedbackController extends Controller
             'feedback_text'       => $request->comment,
         ]);
 
+        if ($feedbackRequest->channel === 'qr') {
+            FeedbackRequest::where('customer_id', $feedbackRequest->customer_id)
+                ->where('company_id', $feedbackRequest->company_id)
+                ->where('channel', 'qr')
+                ->whereIn('status', ['pending', 'sent'])
+                ->update(['status' => 'expired']);
+
+            FeedbackRequest::create([
+                'company_id' => $feedbackRequest->company_id,
+                'customer_id' => $feedbackRequest->customer_id,
+                'channel' => 'qr',
+                'token' => \Illuminate\Support\Str::uuid(),
+                'status' => 'sent',
+                'sent_at' => now(),
+            ]);
+        }
+
         // 🤖 Lance le Job de génération de réponse IA (multilingue)
         dispatch(new GenerateAIReplyJob($feedback));
 
-        // ✅ Logique Google Reviews
+        // ✅ Logique Google Reviews (legacy) et Plateformes multiples
         $googleUrl = null;
+        $reviewPlatforms = $feedbackRequest->company->review_platforms;
 
         if ($feedback->rating >= 4) {
             $googleUrl = $feedbackRequest->company->google_review_url;
         }
 
         return Inertia::render('Feedback/ThankYou', [
-            'rating'    => $feedback->rating,
-            'googleUrl' => $googleUrl,
-            'company'   => $feedbackRequest->company->name,
+            'rating'          => $feedback->rating,
+            'googleUrl'       => $googleUrl,
+            'company'         => $feedbackRequest->company->name,
+            'reviewPlatforms' => $reviewPlatforms,
         ]);
     }
 

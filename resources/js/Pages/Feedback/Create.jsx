@@ -136,4 +136,3 @@ export default function Create({ token, postUrl, company, customer }) {
         </div>
     );
 }
-

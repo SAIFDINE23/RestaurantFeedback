@@ -21,8 +21,10 @@
         "vite": "^6.0.11"
     },
     "dependencies": {
+        "@heroicons/react": "^2.2.0",
         "@inertiajs/react": "^2.3.4",
         "@tailwindcss/vite": "^4.1.18",
-        "lucide-react": "^0.562.0"
+        "lucide-react": "^0.562.0",
+        "qrcode": "^1.5.4"
     }
 }

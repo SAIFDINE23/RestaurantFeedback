@@ -51,5 +51,28 @@ return [
         'model' => env('GEMINI_MODEL'),
     ],
 
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'prices' => [
+            'basic' => env('STRIPE_PRICE_BASIC'),
+            'pro' => env('STRIPE_PRICE_PRO'),
+        ],
+        'addons' => [
+            '100' => [
+                'price' => env('STRIPE_ADDON_100'),
+                'credits' => 100,
+            ],
+            '300' => [
+                'price' => env('STRIPE_ADDON_300'),
+                'credits' => 300,
+            ],
+            '1000' => [
+                'price' => env('STRIPE_ADDON_1000'),
+                'credits' => 1000,
+            ],
+        ],
+    ],
+
 
 ];

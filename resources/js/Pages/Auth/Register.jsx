@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, ChefHat, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -15,7 +16,6 @@ export default function Register() {
 
     const submit = (e) => {
         e.preventDefault();
-
         post(route('register'), {
             onFinish: () => reset('password', 'password_confirmation'),
         });
@@ -34,359 +34,361 @@ export default function Register() {
 
     return (
         <>
-            <Head title="Inscription" />
+            <Head title="Inscription - Feedora" />
 
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 flex items-center justify-center p-4">
-                {/* Decorative elements */}
-                <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-                    <div className="absolute top-40 right-10 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-                    <div className="absolute -bottom-8 left-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
-                </div>
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex flex-col">
+                {/* Header with Logo */}
+                <header className="p-6">
+                    <Link href="/" className="flex items-center space-x-3 w-fit">
+                        <img 
+                            src="/images/logo_feedora.png" 
+                            alt="Feedora Logo" 
+                            className="h-10 w-auto"
+                        />
+                        <span className="text-2xl font-bold text-feedora-500">Feedora</span>
+                    </Link>
+                </header>
 
-                <div className="w-full max-w-5xl relative z-10">
-                    <div className="grid md:grid-cols-2 gap-8 items-start">
-                        {/* Left side - Form */}
-                        <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 md:p-10 shadow-2xl border border-white/20">
-                            <div className="mb-8">
-                                <h1 className="text-4xl font-bold text-white mb-2">
-                                    Créer votre compte
+                {/* Main Content */}
+                <div className="flex-1 flex items-center justify-center p-4 py-8">
+                    <div className="w-full max-w-6xl grid lg:grid-cols-2 gap-12 items-start">
+                        
+                        {/* Left Side - Illustration/Info */}
+                        <div className="hidden lg:flex flex-col justify-center space-y-8 sticky top-8">
+                            <div className="space-y-6">
+                                <div className="inline-flex items-center px-4 py-2 bg-feedora-50 text-feedora-600 rounded-full text-sm font-medium">
+                                    <Sparkles className="w-4 h-4 mr-2" />
+                                    Rejoignez 500+ restaurants
+                                </div>
+                                
+                                <h1 className="text-5xl font-bold text-gray-900 leading-tight">
+                                    Commencez avec
+                                    <span className="block text-feedora-500 mt-2">Feedora</span>
                                 </h1>
-                                <p className="text-gray-300 text-lg">
-                                    Commencez à collecter des feedbacks en quelques minutes
+                                
+                                <p className="text-xl text-gray-600 leading-relaxed">
+                                    Créez votre compte gratuitement et transformez vos feedbacks clients en opportunités.
                                 </p>
                             </div>
 
-                            <form onSubmit={submit} className="space-y-6">
-                                {/* Personal Information Section */}
-                                <div>
-                                    <h3 className="text-sm font-semibold text-gray-200 mb-4 flex items-center">
-                                        <svg className="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        Informations personnelles
-                                    </h3>
+                            {/* Benefits */}
+                            <div className="space-y-4">
+                                <div className="flex items-start space-x-3">
+                                    <CheckCircle2 className="w-6 h-6 text-feedora-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">Configuration en 2 minutes</h3>
+                                        <p className="text-gray-600 text-sm">Commencez immédiatement sans formation</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start space-x-3">
+                                    <CheckCircle2 className="w-6 h-6 text-feedora-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">IA intégrée</h3>
+                                        <p className="text-gray-600 text-sm">Réponses automatiques personnalisées</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start space-x-3">
+                                    <CheckCircle2 className="w-6 h-6 text-feedora-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900">Essai gratuit 14 jours</h3>
+                                        <p className="text-gray-600 text-sm">Aucune carte bancaire requise</p>
+                                    </div>
+                                </div>
+                            </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Name */}
+                            {/* Testimonial */}
+                            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+                                <div className="flex items-center space-x-1 mb-3">
+                                    {[...Array(5)].map((_, i) => (
+                                        <svg key={i} className="w-5 h-5 fill-feedora-500 text-feedora-500" viewBox="0 0 24 24">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                        </svg>
+                                    ))}
+                                </div>
+                                <p className="text-gray-700 italic mb-4">
+                                    "Feedora a complètement transformé notre gestion des avis. Interface intuitive et résultats impressionnants !"
+                                </p>
+                                <div className="flex items-center">
+                                    <div className="w-10 h-10 bg-feedora-200 rounded-full flex items-center justify-center">
+                                        <span className="text-feedora-700 font-bold text-sm">JD</span>
+                                    </div>
+                                    <div className="ml-3">
+                                        <p className="font-semibold text-gray-900 text-sm">Jean Dupont</p>
+                                        <p className="text-xs text-gray-600">Le Bistrot Moderne, Lyon</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Side - Register Form */}
+                        <div className="w-full">
+                            <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 border border-gray-100">
+                                <div className="mb-8">
+                                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                                        Créer votre compte
+                                    </h2>
+                                    <p className="text-gray-600">
+                                        Remplissez le formulaire pour commencer
+                                    </p>
+                                </div>
+
+                                <form onSubmit={submit} className="space-y-6">
+                                    {/* Personal Information Section */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                                            <User className="w-4 h-4 text-feedora-500" />
+                                            <span>Informations personnelles</span>
+                                        </div>
+
+                                        {/* Name Field */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-200 mb-2">
+                                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                                                 Nom complet *
                                             </label>
                                             <div className="relative">
                                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                                    </svg>
+                                                    <User className="w-5 h-5 text-gray-400" />
                                                 </div>
                                                 <input
+                                                    id="name"
                                                     type="text"
                                                     value={data.name}
                                                     onChange={(e) => setData('name', e.target.value)}
-                                                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:bg-white/10"
+                                                    className={`w-full pl-12 pr-4 py-3.5 bg-gray-50 border ${
+                                                        errors.name ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-feedora-500'
+                                                    } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
                                                     placeholder="Jean Dupont"
                                                     autoComplete="name"
                                                     required
                                                 />
                                             </div>
                                             {errors.name && (
-                                                <p className="text-red-400 text-sm mt-2">{errors.name}</p>
+                                                <p className="text-red-500 text-sm mt-2">{errors.name}</p>
                                             )}
                                         </div>
 
-                                        {/* Email */}
+                                        {/* Email Field */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-200 mb-2">
-                                                Email *
+                                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                                                Adresse email *
                                             </label>
                                             <div className="relative">
                                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                                    </svg>
+                                                    <Mail className="w-5 h-5 text-gray-400" />
                                                 </div>
                                                 <input
+                                                    id="email"
                                                     type="email"
                                                     value={data.email}
                                                     onChange={(e) => setData('email', e.target.value)}
-                                                    className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:bg-white/10"
-                                                    placeholder="nom@entreprise.com"
+                                                    className={`w-full pl-12 pr-4 py-3.5 bg-gray-50 border ${
+                                                        errors.email ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-feedora-500'
+                                                    } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
+                                                    placeholder="nom@restaurant.com"
                                                     autoComplete="email"
                                                     required
                                                 />
                                             </div>
                                             {errors.email && (
-                                                <p className="text-red-400 text-sm mt-2">{errors.email}</p>
+                                                <p className="text-red-500 text-sm mt-2">{errors.email}</p>
                                             )}
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Company Information Section */}
-                                <div className="pt-4 border-t border-white/10">
-                                    <h3 className="text-sm font-semibold text-gray-200 mb-4 flex items-center">
-                                        <svg className="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                        </svg>
-                                        Informations entreprise
-                                    </h3>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-200 mb-2">
-                                            Nom de l'entreprise *
-                                        </label>
-                                        <div className="relative">
-                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                                </svg>
-                                            </div>
-                                            <input
-                                                type="text"
-                                                value={data.company_name}
-                                                onChange={(e) => setData('company_name', e.target.value)}
-                                                className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:bg-white/10"
-                                                placeholder="Mon Entreprise SARL"
-                                                required
-                                            />
+                                    {/* Company Information Section */}
+                                    <div className="space-y-4 pt-4 border-t border-gray-200">
+                                        <div className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                                            <Building2 className="w-4 h-4 text-feedora-500" />
+                                            <span>Informations restaurant</span>
                                         </div>
-                                        {errors.company_name && (
-                                            <p className="text-red-400 text-sm mt-2">{errors.company_name}</p>
-                                        )}
-                                    </div>
-                                </div>
 
-                                {/* Security Section */}
-                                <div className="pt-4 border-t border-white/10">
-                                    <h3 className="text-sm font-semibold text-gray-200 mb-4 flex items-center">
-                                        <svg className="w-5 h-5 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                        </svg>
-                                        Sécurité du compte
-                                    </h3>
-
-                                    <div className="space-y-4">
-                                        {/* Password */}
+                                        {/* Company Name Field */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-200 mb-2">
+                                            <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 mb-2">
+                                                Nom du restaurant *
+                                            </label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                    <ChefHat className="w-5 h-5 text-gray-400" />
+                                                </div>
+                                                <input
+                                                    id="company_name"
+                                                    type="text"
+                                                    value={data.company_name}
+                                                    onChange={(e) => setData('company_name', e.target.value)}
+                                                    className={`w-full pl-12 pr-4 py-3.5 bg-gray-50 border ${
+                                                        errors.company_name ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-feedora-500'
+                                                    } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
+                                                    placeholder="La Table Gourmande"
+                                                    required
+                                                />
+                                            </div>
+                                            {errors.company_name && (
+                                                <p className="text-red-500 text-sm mt-2">{errors.company_name}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Password Section */}
+                                    <div className="space-y-4 pt-4 border-t border-gray-200">
+                                        <div className="flex items-center space-x-2 text-sm font-semibold text-gray-700">
+                                            <Lock className="w-4 h-4 text-feedora-500" />
+                                            <span>Sécurité</span>
+                                        </div>
+
+                                        {/* Password Field */}
+                                        <div>
+                                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                                                 Mot de passe *
                                             </label>
                                             <div className="relative">
                                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                    </svg>
+                                                    <Lock className="w-5 h-5 text-gray-400" />
                                                 </div>
                                                 <input
+                                                    id="password"
                                                     type={showPassword ? 'text' : 'password'}
                                                     value={data.password}
                                                     onChange={(e) => setData('password', e.target.value)}
-                                                    className="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:bg-white/10"
-                                                    placeholder="••••••••••"
+                                                    className={`w-full pl-12 pr-12 py-3.5 bg-gray-50 border ${
+                                                        errors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-feedora-500'
+                                                    } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
+                                                    placeholder="••••••••"
                                                     autoComplete="new-password"
                                                     required
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowPassword(!showPassword)}
-                                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-200"
+                                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
                                                 >
-                                                    {showPassword ? (
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    )}
+                                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                                 </button>
                                             </div>
-
-                                            {/* Password Strength Indicator */}
-                                            {data.password.length > 0 && (
-                                                <div className="mt-3">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <span className="text-xs text-gray-400">Force du mot de passe</span>
-                                                        <span className={`text-xs font-medium ${
-                                                            passwordStrength.strength === 100 ? 'text-green-400' :
-                                                            passwordStrength.strength >= 75 ? 'text-blue-400' :
-                                                            passwordStrength.strength >= 50 ? 'text-yellow-400' :
-                                                            'text-red-400'
-                                                        }`}>
-                                                            {passwordStrength.label}
-                                                        </span>
+                                            {data.password && (
+                                                <div className="mt-2">
+                                                    <div className="flex items-center justify-between text-xs mb-1">
+                                                        <span className="text-gray-600">Force du mot de passe</span>
+                                                        <span className={`font-medium ${
+                                                            passwordStrength.strength >= 75 ? 'text-green-600' :
+                                                            passwordStrength.strength >= 50 ? 'text-yellow-600' :
+                                                            'text-red-600'
+                                                        }`}>{passwordStrength.label}</span>
                                                     </div>
-                                                    <div className="w-full bg-white/10 rounded-full h-2">
-                                                        <div
-                                                            className={`h-2 rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                                                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                                                        <div 
+                                                            className={`h-1.5 rounded-full transition-all ${passwordStrength.color}`}
                                                             style={{ width: `${passwordStrength.strength}%` }}
                                                         ></div>
                                                     </div>
                                                 </div>
                                             )}
-
                                             {errors.password && (
-                                                <p className="text-red-400 text-sm mt-2">{errors.password}</p>
+                                                <p className="text-red-500 text-sm mt-2">{errors.password}</p>
                                             )}
                                         </div>
 
-                                        {/* Password Confirmation */}
+                                        {/* Password Confirmation Field */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-200 mb-2">
+                                            <label htmlFor="password_confirmation" className="block text-sm font-medium text-gray-700 mb-2">
                                                 Confirmer le mot de passe *
                                             </label>
                                             <div className="relative">
                                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
+                                                    <Lock className="w-5 h-5 text-gray-400" />
                                                 </div>
                                                 <input
+                                                    id="password_confirmation"
                                                     type={showPasswordConfirm ? 'text' : 'password'}
                                                     value={data.password_confirmation}
                                                     onChange={(e) => setData('password_confirmation', e.target.value)}
-                                                    className="w-full pl-12 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:bg-white/10"
-                                                    placeholder="••••••••••"
+                                                    className={`w-full pl-12 pr-12 py-3.5 bg-gray-50 border ${
+                                                        errors.password_confirmation ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-feedora-500'
+                                                    } rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all`}
+                                                    placeholder="••••••••"
                                                     autoComplete="new-password"
                                                     required
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-200"
+                                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
                                                 >
-                                                    {showPasswordConfirm ? (
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                        </svg>
-                                                    )}
+                                                    {showPasswordConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                                 </button>
                                             </div>
                                             {errors.password_confirmation && (
-                                                <p className="text-red-400 text-sm mt-2">{errors.password_confirmation}</p>
+                                                <p className="text-red-500 text-sm mt-2">{errors.password_confirmation}</p>
                                             )}
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Submit Button */}
-                                <button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="w-full mt-6 bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-blue-500/50 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
-                                >
-                                    {processing ? (
-                                        <div className="flex items-center justify-center gap-2">
-                                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Création du compte...
+                                    {/* Terms */}
+                                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                        <p className="text-xs text-gray-600">
+                                            En créant un compte, vous acceptez nos{' '}
+                                            <a href="#" className="text-feedora-600 hover:text-feedora-700 font-medium">
+                                                Conditions d'utilisation
+                                            </a>{' '}
+                                            et notre{' '}
+                                            <a href="#" className="text-feedora-600 hover:text-feedora-700 font-medium">
+                                                Politique de confidentialité
+                                            </a>
+                                            .
+                                        </p>
+                                    </div>
+
+                                    {/* Submit Button */}
+                                    <button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="w-full flex items-center justify-center px-6 py-4 bg-feedora-500 text-white font-semibold rounded-xl hover:bg-feedora-600 focus:outline-none focus:ring-2 focus:ring-feedora-500 focus:ring-offset-2 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed group"
+                                    >
+                                        {processing ? (
+                                            <span>Création en cours...</span>
+                                        ) : (
+                                            <>
+                                                <span>Créer mon compte</span>
+                                                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {/* Divider */}
+                                    <div className="relative my-6">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <div className="w-full border-t border-gray-200"></div>
                                         </div>
-                                    ) : (
-                                        'Créer mon compte gratuitement'
-                                    )}
-                                </button>
+                                        <div className="relative flex justify-center text-sm">
+                                            <span className="px-4 bg-white text-gray-500">Vous avez déjà un compte ?</span>
+                                        </div>
+                                    </div>
 
-                                {/* Terms */}
-                                <p className="text-center text-xs text-gray-400">
-                                    En créant un compte, vous acceptez nos{' '}
-                                    <a href="#" className="text-blue-400 hover:text-blue-300">
-                                        Conditions d'utilisation
-                                    </a>
-                                    {' '}et notre{' '}
-                                    <a href="#" className="text-blue-400 hover:text-blue-300">
-                                        Politique de confidentialité
-                                    </a>
+                                    {/* Login Link */}
+                                    <Link
+                                        href={route('login')}
+                                        className="w-full flex items-center justify-center px-6 py-4 bg-white text-feedora-600 font-semibold rounded-xl border-2 border-feedora-200 hover:border-feedora-400 hover:bg-feedora-50 focus:outline-none focus:ring-2 focus:ring-feedora-500 focus:ring-offset-2 transition-all duration-300"
+                                    >
+                                        Se connecter
+                                    </Link>
+                                </form>
+                            </div>
+
+                            {/* Mobile Note */}
+                            <div className="lg:hidden mt-8 text-center">
+                                <p className="text-sm text-gray-600">
+                                    Propulsé par <span className="font-semibold text-feedora-600">Feedora</span>
                                 </p>
-                            </form>
-
-                            {/* Login Link */}
-                            <div className="mt-6 text-center text-gray-300 text-sm">
-                                Vous avez déjà un compte ?{' '}
-                                <Link
-                                    href={route('login')}
-                                    className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                                >
-                                    Se connecter
-                                </Link>
-                            </div>
-                        </div>
-
-                        {/* Right side - Features */}
-                        <div className="hidden md:flex flex-col items-center justify-center text-white p-8">
-                            <div className="mb-8 w-80 h-80 rounded-3xl bg-gradient-to-br from-blue-400/20 to-cyan-500/20 backdrop-blur-xl flex items-center justify-center border border-white/10">
-                                <svg className="w-40 h-40 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                                </svg>
-                            </div>
-                            <h2 className="text-3xl font-bold mb-4">Prêt à démarrer ?</h2>
-                            <p className="text-gray-300 text-center mb-8 text-lg">
-                                Rejoignez les 500+ entreprises qui collectent et analysent leurs feedbacks avec intelligence
-                            </p>
-                            <div className="space-y-4 w-full">
-                                <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
-                                    <div className="mt-1">
-                                        <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-white mb-1">Installation rapide</p>
-                                        <p className="text-sm text-gray-300">Configurez votre compte en 2 minutes</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
-                                    <div className="mt-1">
-                                        <div className="w-2 h-2 rounded-full bg-cyan-400"></div>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-white mb-1">IA multilingue</p>
-                                        <p className="text-sm text-gray-300">Réponses en la langue du client</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition">
-                                    <div className="mt-1">
-                                        <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-white mb-1">Pas de carte bancaire</p>
-                                        <p className="text-sm text-gray-300">Essai gratuit sans engagement</p>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <style>{`
-                @keyframes blob {
-                    0%, 100% {
-                        transform: translate(0, 0) scale(1);
-                    }
-                    33% {
-                        transform: translate(30px, -50px) scale(1.1);
-                    }
-                    66% {
-                        transform: translate(-20px, 20px) scale(0.9);
-                    }
-                }
-                .animate-blob {
-                    animation: blob 7s infinite;
-                }
-                .animation-delay-2000 {
-                    animation-delay: 2s;
-                }
-                .animation-delay-4000 {
-                    animation-delay: 4s;
-                }
-            `}</style>
+                {/* Footer */}
+                <footer className="p-6 text-center text-sm text-gray-500">
+                    <p>&copy; 2026 Feedora. Tous droits réservés.</p>
+                </footer>
+            </div>
         </>
     );
 }

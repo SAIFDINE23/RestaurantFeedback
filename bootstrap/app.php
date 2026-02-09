@@ -20,6 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
         HandleInertiaRequests::class,
     ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'stripe/webhook',
+        ]);
+
+        $middleware->alias([
+            'plan.feature' => \App\Http\Middleware\CheckPlanFeature::class,
+            'plan.credits' => \App\Http\Middleware\CheckCredits::class,
+            'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

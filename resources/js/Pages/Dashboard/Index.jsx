@@ -1,8 +1,16 @@
-import { router, Link } from '@inertiajs/react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
+    const responseDelta = (stats.response_rate_7d ?? 0) - (stats.response_rate ?? 0);
+    const avgRating = stats.avg_rating ?? '—';
+    const nps = stats.nps ?? 0;
+    const pending = stats.feedbacks_sent ?? 0;
+    const failed = stats.feedbacks_failed ?? 0;
+    const completed = stats.feedbacks_completed ?? 0;
+    const totalRequests = stats.requests_total ?? 0;
+    const completionRate = totalRequests > 0 ? Math.round((completed / totalRequests) * 100) : 0;
+
     const getInsight = () => {
         if (stats.response_rate >= 80) {
             return {
@@ -38,10 +46,10 @@ export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
         <AuthenticatedLayout user={auth.user} header="Dashboard">
             <Head title="Dashboard" />
 
-            <div className="space-y-8">
+            <div className="space-y-10">
                 {/* Hero Premium */}
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl">
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700"></div>
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-900 to-violet-800"></div>
                     <div className="absolute inset-0 opacity-10">
                         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                         <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2"></div>
@@ -49,15 +57,15 @@ export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
                     <div className="relative p-8 lg:p-10">
                         <div className="flex flex-wrap items-start justify-between gap-6">
                             <div className="flex-1 min-w-[300px]">
-                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold text-white mb-4">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-semibold text-white mb-4">
                                     <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                                    Plateforme Active
+                                    Dashboard Opérationnel
                                 </div>
                                 <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tight mb-3">
-                                    Tableau de bord entreprise
+                                    Performance & Expérience Client
                                 </h1>
                                 <p className="text-lg text-indigo-100/90 max-w-2xl">
-                                    Vue d'ensemble de vos feedbacks, performances et actions prioritaires pour optimiser l'expérience client.
+                                    Suivi en temps réel des KPI business, qualité de service et actions prioritaires.
                                 </p>
                                 <div className="mt-6 flex flex-wrap gap-3">
                                     <Link
@@ -72,15 +80,15 @@ export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
                                         className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 backdrop-blur-sm text-white text-sm font-bold rounded-xl border-2 border-white/30 hover:bg-white/20 transition-all"
                                     >
                                         <ChatIcon />
-                                        Voir les feedbacks
+                                        Feedbacks
                                     </Link>
                                     <Link
                                         href={route('radar')}
                                         className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all"
                                     >
                                         <RadarIcon />
-                                        Ouvrir Radar IA
-                                        <span className="text-[10px] bg-white/30 px-2 py-0.5 rounded-full">NEW</span>
+                                        Radar IA
+                                        <span className="text-[10px] bg-white/30 px-2 py-0.5 rounded-full">PRO</span>
                                     </Link>
                                 </div>
                             </div>
@@ -103,39 +111,41 @@ export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
                     </div>
                 </div>
 
-                {/* Stats Grid */}
+                {/* KPI Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <StatCard title="Clients" value={stats.customers} helper="Total actifs" tone="indigo" icon={<UsersIconSolid />} />
-                    <StatCard title="Demandes" value={stats.requests_total} helper="Total" tone="blue" icon={<SendIcon />} />
-                    <StatCard title="Réponses" value={stats.feedbacks_completed} helper="Complétés" tone="emerald" icon={<CheckIcon />} />
-                    <StatCard title="Taux de réponse" value={`${stats.response_rate}%`} helper="Global" tone="purple" icon={<ChartIcon />} />
+                    <KpiCard title="Demandes (7j)" value={stats.requests_last_7d} helper="volume" tone="indigo" icon={<SendIcon />} />
+                    <KpiCard title="Réponses (7j)" value={stats.completed_last_7d} helper="complétées" tone="emerald" icon={<CheckIcon />} />
+                    <KpiCard title="Taux réponse" value={`${stats.response_rate_7d}%`} helper="7 derniers jours" tone="purple" icon={<ChartIcon />} delta={responseDelta} />
+                    <KpiCard title="Clients" value={stats.customers} helper="actifs" tone="blue" icon={<UsersIconSolid />} />
                 </div>
 
-                {/* Performance & Sentiment */}
+                {/* Operational KPIs */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 lg:col-span-2 hover:shadow-xl transition-shadow">
                         <div className="flex items-center justify-between mb-6">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900">Performance 7 derniers jours</h3>
-                                <p className="text-sm text-gray-500 mt-1">Comparaison avec la période totale</p>
+                                <h3 className="text-xl font-bold text-gray-900">Pipeline opérationnel</h3>
+                                <p className="text-sm text-gray-500 mt-1">Conversion demandes → réponses</p>
                             </div>
-                            <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">vs total</span>
+                            <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                                Taux global {completionRate}%
+                            </span>
                         </div>
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <MiniStat label="Demandes" value={stats.requests_last_7d} sub="7j" />
-                            <MiniStat label="Réponses" value={stats.completed_last_7d} sub="7j" />
-                            <MiniStat label="Taux réponse" value={`${stats.response_rate_7d}%`} sub="7j" />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <ProgressStat label="En attente" value={pending} total={totalRequests} tone="amber" />
+                            <ProgressStat label="Complétés" value={completed} total={totalRequests} tone="emerald" />
+                            <ProgressStat label="Échecs" value={failed} total={totalRequests} tone="rose" />
                         </div>
                         <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <MiniStat label="Note moyenne" value={stats.avg_rating ?? '—'} sub="global" />
-                            <MiniStat label="NPS" value={stats.nps} sub="global" />
-                            <MiniStat label="Échecs" value={stats.feedbacks_failed} sub="global" />
+                            <MiniStat label="Note moyenne" value={avgRating} sub="global" />
+                            <MiniStat label="NPS" value={nps} sub="global" />
+                            <MiniStat label="Taux réponse" value={`${stats.response_rate}%`} sub="global" />
                         </div>
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 hover:shadow-xl transition-shadow">
                         <div className="mb-6">
-                            <h3 className="text-xl font-bold text-gray-900">Sentiment</h3>
+                            <h3 className="text-xl font-bold text-gray-900">Sentiment client</h3>
                             <p className="text-sm text-gray-500 mt-1">Positif / Neutre / Négatif</p>
                         </div>
                         <div className="mt-4">
@@ -220,7 +230,7 @@ export default function Index({ auth, stats, recentFeedbacks, feedbackTrend }) {
                     <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 hover:shadow-xl transition-shadow">
                         <div className="mb-6">
                             <h3 className="text-xl font-bold text-gray-900">Derniers feedbacks</h3>
-                            <p className="text-sm text-gray-500 mt-1">Résumé opérationnel</p>
+                            <p className="text-sm text-gray-500 mt-1">Actions rapides</p>
                         </div>
                         <div className="mt-4 space-y-3">
                             {recentFeedbacks.slice(0, 5).map((fb) => (
@@ -344,12 +354,73 @@ function StatCard({ title, value, helper, icon, tone }) {
     );
 }
 
+function KpiCard({ title, value, helper, icon, tone, delta }) {
+    const deltaLabel = typeof delta === 'number'
+        ? `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`
+        : null;
+    const deltaTone = delta > 0 ? 'text-emerald-600 bg-emerald-50' : delta < 0 ? 'text-rose-600 bg-rose-50' : 'text-gray-600 bg-gray-50';
+
+    return (
+        <div className={`relative group bg-white rounded-2xl shadow-sm border-2 p-6 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 ${
+            tone === 'indigo' ? 'border-indigo-200' :
+            tone === 'emerald' ? 'border-emerald-200' :
+            tone === 'purple' ? 'border-purple-200' :
+            'border-blue-200'
+        }`}>
+            <div className="flex items-start justify-between">
+                <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">{title}</p>
+                    <p className="text-4xl font-black text-gray-900 mt-2">{value}</p>
+                    <div className="mt-2 flex items-center gap-2">
+                        {helper && <span className="text-xs font-medium text-gray-500">{helper}</span>}
+                        {deltaLabel && (
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${deltaTone}`}>
+                                {deltaLabel}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg ${
+                    tone === 'indigo' ? 'bg-gradient-to-br from-indigo-500 to-violet-600' :
+                    tone === 'emerald' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' :
+                    tone === 'purple' ? 'bg-gradient-to-br from-purple-500 to-fuchsia-600' :
+                    'bg-gradient-to-br from-blue-500 to-indigo-500'
+                }`}>
+                    {icon}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function MiniStat({ label, value, sub }) {
     return (
         <div className="group p-5 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-gray-50 to-white hover:from-indigo-50 hover:to-white hover:border-indigo-200 transition-all duration-300">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</p>
             <p className="text-3xl font-black text-gray-900 mt-2 group-hover:text-indigo-600 transition-colors">{value}</p>
             <p className="text-xs font-medium text-gray-400 mt-1">{sub}</p>
+        </div>
+    );
+}
+
+function ProgressStat({ label, value, total, tone }) {
+    const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+    const tones = {
+        amber: 'from-amber-500 to-orange-500',
+        emerald: 'from-emerald-500 to-teal-500',
+        rose: 'from-rose-500 to-pink-500',
+    };
+
+    return (
+        <div className="rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-gray-50 to-white p-5">
+            <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</p>
+                <span className="text-xs font-semibold text-gray-400">{percentage}%</span>
+            </div>
+            <p className="text-3xl font-black text-gray-900 mt-2">{value}</p>
+            <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full bg-gradient-to-r ${tones[tone]} transition-all duration-700`} style={{ width: `${percentage}%` }} />
+            </div>
         </div>
     );
 }

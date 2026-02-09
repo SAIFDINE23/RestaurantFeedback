@@ -2,10 +2,68 @@
 
 namespace App\Services;
 
+use App\Models\Subscription;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SmsService
 {
+    /**
+     * Vérifier et envoyer un SMS avec consommation de crédits
+     * 
+     * @param string $to Numéro de téléphone
+     * @param string $message Contenu du message
+     * @param Subscription|null $subscription La subscription de la company (optionnel)
+     * @return array
+     * @throws \RuntimeException Si crédits insuffisants ou erreur Brevo
+     */
+    public function sendWithCredits(string $to, string $message, ?Subscription $subscription = null): array
+    {
+        // Si pas de subscription, on envoie simplement (backward compatible)
+        if (!$subscription) {
+            return $this->send($to, $message);
+        }
+
+        // 1️⃣ Vérifier les crédits disponibles
+        $creditService = app(\App\Services\CreditConsumptionService::class);
+        
+        // Extraire le code pays du numéro (approx)
+        $countryCode = $this->extractCountryCode($to);
+        
+        if (!$creditService->canSendSms($subscription, $countryCode, 1)) {
+            throw new \RuntimeException(
+                'Crédits insuffisants pour envoyer ce SMS. ' .
+                'Disponible: ' . $subscription->credits->credits_total_available . ' unités'
+            );
+        }
+
+        // 2️⃣ Envoyer le SMS
+        $result = $this->send($to, $message);
+
+        // 3️⃣ Consommer les crédits
+        try {
+            $creditService->consumeCreditsForSms($subscription, $countryCode, 1);
+            
+            Log::info('SMS envoyé et crédits consommés', [
+                'subscription_id' => $subscription->id,
+                'country_code' => $countryCode,
+                'message_id' => $result['messageId'] ?? null,
+            ]);
+        } catch (\Exception $e) {
+            // Log l'erreur mais ne bloque pas (SMS déjà envoyé)
+            Log::error('Erreur lors de la consommation des crédits', [
+                'subscription_id' => $subscription->id,
+                'error' => $e->getMessage(),
+                'message_id' => $result['messageId'] ?? null,
+            ]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Envoyer un SMS simple (sans vérification de crédits)
+     */
     public function send(string $to, string $message): array
     {
         $to = $this->normalizePhoneNumber($to);
@@ -36,6 +94,48 @@ class SmsService
             'status' => $response->status(),
             'response' => $response->json(),
         ];
+    }
+
+    /**
+     * Extraire le code pays du numéro de téléphone
+     * Format: +33... → FR, +212... → MA, +1... → US, etc.
+     */
+    private function extractCountryCode(string $phone): string
+    {
+        $phone = $this->normalizePhoneNumber($phone);
+        
+        // Mappings pays courants
+        $countryMap = [
+            '+33' => 'FR',  // France
+            '+212' => 'MA', // Maroc
+            '+34' => 'ES',  // Espagne
+            '+39' => 'IT',  // Italie
+            '+49' => 'DE',  // Allemagne
+            '+44' => 'GB',  // UK
+            '+1' => 'US',   // USA/Canada
+            '+44' => 'GB',  // UK
+            '+45' => 'DK',  // Danemark
+            '+46' => 'SE',  // Suède
+            '+47' => 'NO',  // Norvège
+            '+41' => 'CH',  // Suisse
+            '+43' => 'AT',  // Autriche
+            '+32' => 'BE',  // Belgique
+            '+31' => 'NL',  // Pays-Bas
+            '+40' => 'RO',  // Roumanie
+            '+48' => 'PL',  // Pologne
+            '+420' => 'CZ', // Tchéquie
+            '+36' => 'HU',  // Hongrie
+        ];
+        
+        // Chercher le code pays le plus long en match
+        foreach ($countryMap as $prefix => $code) {
+            if (str_starts_with($phone, $prefix)) {
+                return $code;
+            }
+        }
+        
+        // Default: FR si on ne reconnaît pas
+        return 'FR';
     }
 
     private function normalizePhoneNumber(string $phone): string

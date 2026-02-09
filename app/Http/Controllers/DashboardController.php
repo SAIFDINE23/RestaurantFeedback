@@ -182,6 +182,199 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function analytics()
+    {
+        $company = Auth::user()->company;
+
+        if (! $company) {
+            return redirect()->route('dashboard');
+        }
+
+        $now = now();
+        $from = now()->subDays(29)->startOfDay();
+        $prevFrom = now()->subDays(59)->startOfDay();
+        $prevTo = now()->subDays(30)->endOfDay();
+
+        $requestsQuery = FeedbackRequest::where('company_id', $company->id);
+        $requestsTotal = (clone $requestsQuery)->count();
+        $completedTotal = (clone $requestsQuery)->where('status', 'completed')->count();
+        $failedTotal = (clone $requestsQuery)->where('status', 'failed')->count();
+        $requestsLast30 = (clone $requestsQuery)->whereBetween('created_at', [$from, $now])->count();
+        $requestsPrev30 = (clone $requestsQuery)->whereBetween('created_at', [$prevFrom, $prevTo])->count();
+        $completedLast30 = (clone $requestsQuery)->where('status', 'completed')->whereBetween('created_at', [$from, $now])->count();
+        $completedPrev30 = (clone $requestsQuery)->where('status', 'completed')->whereBetween('created_at', [$prevFrom, $prevTo])->count();
+
+        $responseRate = $requestsTotal > 0
+            ? round(($completedTotal / $requestsTotal) * 100, 1)
+            : 0;
+        $responseRateLast30 = $requestsLast30 > 0
+            ? round(($completedLast30 / $requestsLast30) * 100, 1)
+            : 0;
+        $responseRatePrev30 = $requestsPrev30 > 0
+            ? round(($completedPrev30 / $requestsPrev30) * 100, 1)
+            : 0;
+
+        $feedbacksQuery = Feedback::whereHas('feedbackRequest', function ($q) use ($company) {
+            $q->where('company_id', $company->id);
+        });
+
+        $feedbacksTotal = (clone $feedbacksQuery)->count();
+        $avgRating = (clone $feedbacksQuery)->avg('rating');
+        $avgRating = $avgRating ? round((float) $avgRating, 2) : null;
+
+        $ratingDistribution = collect([1, 2, 3, 4, 5])->mapWithKeys(function ($star) use ($feedbacksQuery) {
+            return [$star => (clone $feedbacksQuery)->where('rating', $star)->count()];
+        });
+
+        $positiveCount = (clone $feedbacksQuery)->whereIn('rating', [4, 5])->count();
+        $negativeCount = (clone $feedbacksQuery)->whereIn('rating', [1, 2])->count();
+        $neutralCount = (clone $feedbacksQuery)->where('rating', 3)->count();
+
+        $promoters = (clone $feedbacksQuery)->where('rating', 5)->count();
+        $detractors = (clone $feedbacksQuery)->whereIn('rating', [1, 2])->count();
+        $nps = $feedbacksTotal > 0
+            ? round((($promoters - $detractors) / $feedbacksTotal) * 100, 1)
+            : 0;
+
+        $positiveRate = $feedbacksTotal > 0
+            ? round(($positiveCount / $feedbacksTotal) * 100, 1)
+            : 0;
+
+        $responseTimes = (clone $requestsQuery)
+            ->whereNotNull('sent_at')
+            ->whereNotNull('responded_at')
+            ->get(['sent_at', 'responded_at']);
+
+        $avgResponseHours = $responseTimes->count() > 0
+            ? round($responseTimes->avg(fn ($r) => $r->sent_at->diffInMinutes($r->responded_at)) / 60, 2)
+            : null;
+
+        $responseTimeByChannel = (clone $requestsQuery)
+            ->whereNotNull('sent_at')
+            ->whereNotNull('responded_at')
+            ->select('channel', 'sent_at', 'responded_at')
+            ->get()
+            ->groupBy('channel')
+            ->map(function ($rows) {
+                $avgMinutes = $rows->avg(fn ($r) => $r->sent_at->diffInMinutes($r->responded_at));
+                return $avgMinutes ? round($avgMinutes / 60, 2) : null;
+            });
+
+        $responseBuckets = [
+            '0-2h' => 0,
+            '2-6h' => 0,
+            '6-24h' => 0,
+            '24h+' => 0,
+        ];
+
+        foreach ($responseTimes as $r) {
+            $hours = $r->sent_at->diffInHours($r->responded_at);
+            if ($hours <= 2) {
+                $responseBuckets['0-2h']++;
+            } elseif ($hours <= 6) {
+                $responseBuckets['2-6h']++;
+            } elseif ($hours <= 24) {
+                $responseBuckets['6-24h']++;
+            } else {
+                $responseBuckets['24h+']++;
+            }
+        }
+
+        $requestsByDayRaw = (clone $requestsQuery)
+            ->whereBetween('created_at', [$from, $now])
+            ->selectRaw('DATE(created_at) as date, count(*) as count')
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->date => (int) $row->count]);
+
+        $completedByDayRaw = (clone $requestsQuery)
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [$from, $now])
+            ->selectRaw('DATE(created_at) as date, count(*) as count')
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->date => (int) $row->count]);
+
+        $ratingByDayRaw = (clone $feedbacksQuery)
+            ->whereBetween('created_at', [$from, $now])
+            ->selectRaw('DATE(created_at) as date, avg(rating) as avg_rating')
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get()
+            ->mapWithKeys(fn ($row) => [$row->date => round((float) $row->avg_rating, 2)]);
+
+        $weekdayRaw = (clone $requestsQuery)
+            ->whereBetween('created_at', [$from, $now])
+            ->selectRaw('EXTRACT(DOW FROM created_at) as dow, count(*) as count')
+            ->groupBy('dow')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->dow => (int) $row->count]);
+
+        $hourRaw = (clone $requestsQuery)
+            ->whereBetween('created_at', [$from, $now])
+            ->selectRaw('EXTRACT(HOUR FROM created_at) as hour, count(*) as count')
+            ->groupBy('hour')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(int) $row->hour => (int) $row->count]);
+
+        $trend = collect();
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $trend->push([
+                'date' => $date,
+                'requests' => $requestsByDayRaw->get($date, 0),
+                'completed' => $completedByDayRaw->get($date, 0),
+                'avg_rating' => $ratingByDayRaw->get($date, null),
+            ]);
+        }
+
+        $channels = [
+            'email' => (clone $requestsQuery)->where('channel', 'email')->count(),
+            'sms' => (clone $requestsQuery)->where('channel', 'sms')->count(),
+            'qr' => (clone $requestsQuery)->where('channel', 'qr')->count(),
+        ];
+
+        $channelPerformance = collect(['email', 'sms', 'qr'])->mapWithKeys(function ($channel) use ($requestsQuery) {
+            $total = (clone $requestsQuery)->where('channel', $channel)->count();
+            $completed = (clone $requestsQuery)->where('channel', $channel)->where('status', 'completed')->count();
+            $rate = $total > 0 ? round(($completed / $total) * 100, 1) : 0;
+            return [$channel => ['total' => $total, 'completed' => $completed, 'rate' => $rate]];
+        });
+
+        $stats = [
+            'requests_total' => $requestsTotal,
+            'completed_total' => $completedTotal,
+            'failed_total' => $failedTotal,
+            'response_rate' => $responseRate,
+            'response_rate_last_30' => $responseRateLast30,
+            'response_rate_prev_30' => $responseRatePrev30,
+            'requests_last_30' => $requestsLast30,
+            'requests_prev_30' => $requestsPrev30,
+            'avg_rating' => $avgRating,
+            'nps' => $nps,
+            'positive_rate' => $positiveRate,
+            'avg_response_hours' => $avgResponseHours,
+            'feedbacks_total' => $feedbacksTotal,
+            'positive_count' => $positiveCount,
+            'neutral_count' => $neutralCount,
+            'negative_count' => $negativeCount,
+        ];
+
+        return Inertia::render('Analytics/Index', [
+            'stats' => $stats,
+            'trend' => $trend,
+            'channels' => $channels,
+            'responseBuckets' => $responseBuckets,
+            'ratingDistribution' => $ratingDistribution,
+            'channelPerformance' => $channelPerformance,
+            'responseTimeByChannel' => $responseTimeByChannel,
+            'weekdayDistribution' => collect(range(0, 6))->map(fn ($d) => $weekdayRaw->get($d, 0)),
+            'hourDistribution' => collect(range(0, 23))->map(fn ($h) => $hourRaw->get($h, 0)),
+        ]);
+    }
+
     public function exportRadar(Request $request)
     {
         $company = Auth::user()->company;

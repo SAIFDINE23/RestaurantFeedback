@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 use App\Http\Controllers\{
@@ -13,7 +14,11 @@ use App\Http\Controllers\{
     FeedbackRequestController,
     ProfileController,
     FeedbackReplyController,
-    TaskController
+    TaskController,
+    PricingController,
+    SubscriptionController,
+    StripeController,
+    StripeWebhookController
 };
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminRadarController;
@@ -27,13 +32,29 @@ use App\Services\SmsService;
 */
 
 Route::get('/', function () {
+    // Récupérer les plans pour l'affichage sur la page d'accueil
+    $plans = \App\Models\Plan::active()->orderBy('sort_order')->get()->toArray();
+    
     return Inertia::render('Welcome', [
         'canLogin'       => Route::has('login'),
         'canRegister'    => Route::has('register'),
         'laravelVersion' => Application::VERSION,
         'phpVersion'     => PHP_VERSION,
+        'plans'          => $plans,
     ]);
 });
+
+// Page Pricing (publique)
+Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
+
+/*
+|--------------------------------------------------------------------------
+| Webhooks (publique - sans authentification)
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])
+    ->name('webhooks.stripe');
 
 /*
 |--------------------------------------------------------------------------
@@ -79,10 +100,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Génération IA d'une réponse
     Route::post('/feedback/{id}/replies/ai', [FeedbackReplyController::class, 'generateAIReply'])
+        ->middleware('plan.feature:ai_reply_generation')
         ->name('feedback.replies.ai');
 
     // Génération IA synchrone (retourne le contenu généré en JSON)
     Route::post('/feedback/{id}/replies/ai/generate', [FeedbackReplyController::class, 'generateAIReplySync'])
+        ->middleware('plan.feature:ai_reply_generation')
         ->name('feedback.replies.ai.generate');
 
     /*
@@ -92,9 +115,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dashboard');
 
     Route::get('/radar-ia', [DashboardController::class, 'radar'])
+        ->middleware('plan.feature:radar_ai')
         ->name('radar');
     Route::get('/radar-ia/export', [DashboardController::class, 'exportRadar'])
+        ->middleware('plan.feature:radar_ai')
         ->name('radar.export');
+
+    /*
+    | Subscription & Crédits
+    */
+    Route::get('/subscription', [SubscriptionController::class, 'index'])
+        ->name('subscription.index');
+    
+    Route::get('/subscription/portal', [SubscriptionController::class, 'portal'])
+        ->name('subscription.portal');
+    
+    Route::get('/subscription/upgrade/{planId}', [SubscriptionController::class, 'upgrade'])
+        ->name('subscription.upgrade');
+    
+    Route::post('/subscription/upgrade/{planId}', [SubscriptionController::class, 'confirmUpgrade'])
+        ->name('subscription.confirmUpgrade');
+
+    /*
+    | Stripe Checkout
+    */
+    Route::post('/stripe/checkout/plan/{planId}', [StripeController::class, 'checkoutPlan'])
+        ->name('stripe.checkout.plan');
+    Route::post('/stripe/checkout/addon/{addonId}', [StripeController::class, 'checkoutAddon'])
+        ->name('stripe.checkout.addon');
+
+    Route::get('/stripe/success', [StripeController::class, 'success'])
+        ->name('stripe.success');
+    Route::get('/stripe/cancel', [StripeController::class, 'cancel'])
+        ->name('stripe.cancel');
 
     /*
     | Tasks (company)
@@ -105,6 +158,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('tasks.store');
     Route::patch('/tasks/{task}/status', [TaskController::class, 'updateStatus'])
         ->name('tasks.updateStatus');
+
+    /*
+    | Analytics (company)
+    */
+    Route::get('/analytics', [DashboardController::class, 'analytics'])
+        ->name('analytics');
 
     /*
     | Profile
@@ -124,6 +183,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/customers', [CustomerController::class, 'store'])
         ->name('customers.store');
+    Route::get('/customers/{customer}', [CustomerController::class, 'show'])
+        ->name('customers.show');
+    Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])
+        ->name('customers.edit');
+    Route::get('/customers/{customer}/qr', [CustomerController::class, 'qr'])
+        ->name('customers.qr');
+    Route::put('/customers/{customer}', [CustomerController::class, 'update'])
+        ->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])
     ->name('customers.destroy');
 
@@ -137,15 +204,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/company/settings', [CompanyController::class, 'update'])
         ->name('company.update');
 
+    Route::get('/company/review-platforms', [CompanyController::class, 'editReviewPlatforms'])
+        ->name('company.review-platforms.edit');
+
+    Route::post('/company/review-platforms', [CompanyController::class, 'updateReviewPlatforms'])
+        ->name('company.review-platforms.update');
+
+    Route::get('/account-settings', function (Request $request) {
+        return Inertia::render('Settings/Index', [
+            'company' => $request->user()->company,
+        ]);
+    })->name('settings.index');
+
+    Route::put('/account-settings', [CompanyController::class, 'update'])
+        ->name('settings.update');
+
     /*
     | Feedback requests (send / resend)
     */
     Route::post('/feedback-requests', [FeedbackRequestController::class, 'store'])
+        ->middleware(['plan.credits:1', 'plan.limits:feedbacks'])
         ->name('feedback-requests.store');
     
     Route::post('/feedback-requests/bulk', [FeedbackRequestController::class, 'storeBulk'])
+        ->middleware(['plan.credits:1', 'plan.limits:feedbacks'])
         ->name('feedback-requests.bulk');
 });
+
+// Stripe Webhook (public)
+Route::post('/stripe/webhook', [StripeController::class, 'webhook'])
+    ->name('stripe.webhook');
 
 /*
 ||--------------------------------------------------------------------------

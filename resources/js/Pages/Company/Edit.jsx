@@ -7,7 +7,6 @@ export default function Edit({ auth, company }) {
         name: company?.name || '',
         sector: company?.sector || '',
         google_place_id: company?.google_place_id || '',
-        google_review_url: company?.google_review_url || '',
     });
 
     const submit = (e) => {
@@ -94,7 +93,7 @@ export default function Edit({ auth, company }) {
                                             Intégration Google Business
                                         </h4>
                                         <p className="text-base text-gray-600">
-                                            Connectez votre profil Google pour rediriger vos clients vers vos avis Google.
+                                            Configurez votre Google Place ID et gérez vos liens d'avis dans la section "Plateformes d'avis".
                                         </p>
                                     </div>
                                 </div>
@@ -109,16 +108,6 @@ export default function Edit({ auth, company }) {
                                     icon={<MapPin className="w-5 h-5 text-gray-400" />}
                                     error={errors.google_place_id}
                                     helpText="L'identifiant unique de votre établissement sur Google Maps"
-                                />
-
-                                <FormInput
-                                    label="Lien Google Reviews"
-                                    value={data.google_review_url}
-                                    onChange={(e) => setData('google_review_url', e.target.value)}
-                                    placeholder="https://g.page/r/..."
-                                    icon={<LinkIcon className="w-5 h-5 text-gray-400" />}
-                                    error={errors.google_review_url}
-                                    helpText="Le lien direct pour laisser un avis sur votre fiche Google"
                                 />
                             </div>
                         </div>

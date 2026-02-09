@@ -17,8 +17,8 @@ export default function AlreadySubmitted({ company }) {
                 {/* Background blobs animés */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-blue-400 to-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-                    <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+                    <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-blue-400 to-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
                 </div>
 
                 <div className={`relative z-10 w-full max-w-2xl transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -122,7 +122,7 @@ export default function AlreadySubmitted({ company }) {
                                     </p>
                                     <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
                                         <Sparkles className="w-4 h-4 text-blue-500" />
-                                        Powered by Luminea
+                                        Powered by Feedora
                                         <Sparkles className="w-4 h-4 text-indigo-500" />
                                     </p>
                                 </div>
@@ -152,6 +152,13 @@ export default function AlreadySubmitted({ company }) {
                     }
                     .animate-scale-in {
                         animation: scale-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    }
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                    }
+                    .animate-pulse {
+                        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                     }
                 `}</style>
             </div>

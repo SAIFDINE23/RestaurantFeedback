@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Company;
+use App\Observers\CompanyObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
     if (config('app.env') !== 'local') {
         URL::forceScheme('https');
     }
+
+    // Register observers
+    Company::observe(CompanyObserver::class);
 }
 
 }
