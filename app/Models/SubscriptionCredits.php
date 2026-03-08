@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class SubscriptionCredits extends Model
@@ -48,68 +50,146 @@ class SubscriptionCredits extends Model
     }
 
     /**
-     * Effectue le reset mensuel
+     * Effectue le reset mensuel (avec lock pour éviter les race conditions)
      */
     public function resetMonthlyCredits(): void
     {
-        $this->credits_used_monthly = 0;
-        $this->credits_available_monthly = $this->credits_monthly;
-        $this->credits_total_available = $this->credits_monthly + $this->credits_addon_balance;
-        $this->last_reset_date = now()->toDateString();
-        $this->save();
+        DB::transaction(function () {
+            // Recharger avec lock pessimiste
+            $locked = self::where('id', $this->id)->lockForUpdate()->first();
+            if (!$locked || !$locked->needsMonthlyReset()) {
+                return; // Déjà reseté par un autre process
+            }
+
+            $locked->credits_used_monthly = 0;
+            $locked->credits_available_monthly = $locked->credits_monthly;
+            $locked->credits_total_available = $locked->credits_monthly + max(0, $locked->credits_addon_balance);
+            $locked->last_reset_date = now()->toDateString();
+            $locked->save();
+
+            // Sync état local
+            $this->refresh();
+
+            Log::info('Monthly credits reset', [
+                'subscription_id' => $this->subscription_id,
+                'credits_monthly' => $this->credits_monthly,
+            ]);
+        });
     }
 
     /**
-     * Ajoute des crédits add-on (recharge)
+     * Ajoute des crédits add-on (recharge) — avec transaction DB
      */
     public function addAddonCredits(float $amount, string $reference = null): void
     {
-        $this->credits_addon_balance += $amount;
-        $this->recalculateTotalAvailable();
-        $this->save();
+        if ($amount <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($amount, $reference) {
+            $locked = self::where('id', $this->id)->lockForUpdate()->first();
+
+            $locked->credits_addon_balance += $amount;
+            $locked->recalculateTotalAvailable();
+            $locked->save();
+
+            // Sync état local
+            $this->refresh();
+
+            Log::info('Addon credits added', [
+                'subscription_id' => $this->subscription_id,
+                'amount' => $amount,
+                'reference' => $reference,
+                'new_addon_balance' => $locked->credits_addon_balance,
+                'new_total' => $locked->credits_total_available,
+            ]);
+        });
     }
 
     /**
-     * Consomme des crédits
+     * Consomme des crédits avec protection race condition
      * Consomme d'abord le quota mensuel, puis les add-ons
+     * Utilise un lock pessimiste DB pour garantir l'intégrité
      */
     public function consumeCredits(float $amount): bool
     {
-        // Auto-reset si nécessaire
-        if ($this->needsMonthlyReset()) {
-            $this->resetMonthlyCredits();
+        if ($amount <= 0) {
+            return true;
         }
 
-        // Vérifier si suffisant
-        if ($this->credits_total_available < $amount) {
-            return false;
-        }
+        return DB::transaction(function () use ($amount) {
+            // Lock pessimiste — empêche les lectures concurrentes
+            $locked = self::where('id', $this->id)->lockForUpdate()->first();
 
-        // Consommer d'abord le quota mensuel
-        if ($this->credits_available_monthly >= $amount) {
-            $this->credits_used_monthly += $amount;
-            $this->credits_available_monthly -= $amount;
-        } else {
-            // Consommer le reste du quota, puis les add-ons
-            $toConsume = $amount - $this->credits_available_monthly;
-            $this->credits_used_monthly += $this->credits_available_monthly;
-            $this->credits_available_monthly = 0;
-            $this->credits_addon_balance -= $toConsume;
-        }
+            if (!$locked) {
+                return false;
+            }
 
-        $this->recalculateTotalAvailable();
-        $this->save();
+            // Auto-reset si nécessaire
+            if ($locked->needsMonthlyReset()) {
+                $locked->credits_used_monthly = 0;
+                $locked->credits_available_monthly = $locked->credits_monthly;
+                $locked->credits_addon_balance = max(0, $locked->credits_addon_balance);
+                $locked->credits_total_available = $locked->credits_monthly + $locked->credits_addon_balance;
+                $locked->last_reset_date = now()->toDateString();
+            }
 
-        return true;
+            // Vérifier si suffisant
+            if ($locked->credits_total_available < $amount) {
+                Log::warning('Credit consumption rejected: insufficient credits', [
+                    'subscription_id' => $locked->subscription_id,
+                    'requested' => $amount,
+                    'available' => $locked->credits_total_available,
+                ]);
+                return false;
+            }
+
+            // Consommer d'abord le quota mensuel
+            if ($locked->credits_available_monthly >= $amount) {
+                $locked->credits_used_monthly += $amount;
+                $locked->credits_available_monthly -= $amount;
+            } else {
+                // Consommer le reste du quota, puis les add-ons
+                $fromMonthly = $locked->credits_available_monthly;
+                $fromAddon = $amount - $fromMonthly;
+
+                $locked->credits_used_monthly += $fromMonthly;
+                $locked->credits_available_monthly = 0;
+                $locked->credits_addon_balance = max(0, $locked->credits_addon_balance - $fromAddon);
+            }
+
+            $locked->recalculateTotalAvailable();
+
+            // Protection ultime contre les valeurs négatives
+            $locked->credits_available_monthly = max(0, $locked->credits_available_monthly);
+            $locked->credits_addon_balance = max(0, $locked->credits_addon_balance);
+            $locked->credits_total_available = max(0, $locked->credits_total_available);
+
+            $locked->save();
+
+            // Sync état local
+            $this->refresh();
+
+            Log::info('Credits consumed', [
+                'subscription_id' => $locked->subscription_id,
+                'amount' => $amount,
+                'monthly_remaining' => $locked->credits_available_monthly,
+                'addon_remaining' => $locked->credits_addon_balance,
+                'total_remaining' => $locked->credits_total_available,
+            ]);
+
+            return true;
+        });
     }
 
     /**
-     * Recalcule le total disponible
+     * Recalcule le total disponible (avec floor à 0)
      */
     public function recalculateTotalAvailable(): void
     {
-        $this->credits_total_available = 
-            $this->credits_available_monthly + $this->credits_addon_balance;
+        $this->credits_total_available = max(0,
+            max(0, $this->credits_available_monthly) + max(0, $this->credits_addon_balance)
+        );
     }
 
     /**
@@ -130,7 +210,7 @@ class SubscriptionCredits extends Model
      */
     public function getFormattedBalance(): string
     {
-        return number_format($this->credits_total_available, 2, ',', ' ') . ' unités';
+        return number_format(max(0, $this->credits_total_available), 2, ',', ' ') . ' unités';
     }
 
     /**

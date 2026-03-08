@@ -22,7 +22,13 @@ class FeedbackController extends Controller
         $feedbacks = FeedbackRequest::where('company_id', $company->id)
             ->whereHas('customer')
             ->with(['customer', 'feedback'])
-            ->latest()
+            ->addSelect([
+                'is_pinned_flag' => Feedback::select('is_pinned')
+                    ->whereColumn('feedback_request_id', 'feedback_requests.id')
+                    ->limit(1)
+            ])
+            ->orderByDesc('is_pinned_flag')
+            ->orderByDesc('created_at')
             ->paginate(15)
             ->through(fn ($f) => [
                 'id' => $f->id,
@@ -38,6 +44,8 @@ class FeedbackController extends Controller
                     'id' => $f->feedback?->id,
                     'rating' => $f->feedback?->rating,
                     'comment' => $f->feedback?->comment,
+                    'is_pinned' => $f->feedback?->is_pinned ?? false,
+                    'pinned_at' => $f->feedback?->pinned_at,
                 ],
                 'created_at' => $f->created_at->format('Y-m-d H:i'),
             ]);
@@ -173,13 +181,129 @@ class FeedbackController extends Controller
             ->findOrFail($id);
 
         return Inertia::render('Feedback/Show', [
-            'token'    => $feedbackRequest->token,
-            'feedback' => $feedbackRequest->feedback,
-            'status'   => $feedbackRequest->status,
-            'company'  => $feedbackRequest->company->name,
-            'customer' => optional($feedbackRequest->customer)->name,
-            'isAdmin'  => Auth::check(), 
+            'token'        => $feedbackRequest->token,
+            'feedback'     => [
+                'id'          => $feedbackRequest->feedback->id,
+                'rating'      => $feedbackRequest->feedback->rating,
+                'comment'     => $feedbackRequest->feedback->comment,
+                'is_pinned'   => $feedbackRequest->feedback->is_pinned,
+                'created_at'  => $feedbackRequest->feedback->created_at->format('Y-m-d H:i'),
+            ],
+            'status'       => $feedbackRequest->status,
+            'company'      => $feedbackRequest->company->name,
+            'customer'     => optional($feedbackRequest->customer)->name,
+            'isAdmin'      => Auth::check(), 
         // ou Auth::user()?->is_admin si tu as un champ
+        ]);
+    }
+
+    /**
+     * Marquer un feedback comme résolu
+     */
+    public function resolve(Request $request, int $id)
+    {
+        $feedback = Feedback::findOrFail($id);
+        
+        // Vérifier que l'utilisateur appartient à la bonne entreprise
+        $company = Auth::user()->company;
+        if ($feedback->feedbackRequest->company_id !== $company->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $feedback->markResolved(Auth::id(), $request->input('resolution_note'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback marqué comme résolu',
+            'resolved_at' => $feedback->resolved_at->format('Y-m-d H:i'),
+        ]);
+    }
+
+    /**
+     * Marquer un feedback comme non résolu
+     */
+    public function unresolve(Request $request, int $id)
+    {
+        $feedback = Feedback::findOrFail($id);
+        
+        // Vérifier que l'utilisateur appartient à la bonne entreprise
+        $company = Auth::user()->company;
+        if ($feedback->feedbackRequest->company_id !== $company->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $feedback->markUnresolved();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback marqué comme non résolu',
+        ]);
+    }
+
+    /**
+     * Épingler un feedback
+     */
+    public function pin(Request $request, int $id)
+    {
+        $feedback = Feedback::findOrFail($id);
+        
+        // Vérifier que l'utilisateur appartient à la bonne entreprise
+        $company = Auth::user()->company;
+        if ($feedback->feedbackRequest->company_id !== $company->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $feedback->pin();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback épinglé',
+            'is_pinned' => true,
+            'pinned_at' => $feedback->pinned_at->format('Y-m-d H:i'),
+        ]);
+    }
+
+    /**
+     * Dépingler un feedback
+     */
+    public function unpin(Request $request, int $id)
+    {
+        $feedback = Feedback::findOrFail($id);
+        
+        // Vérifier que l'utilisateur appartient à la bonne entreprise
+        $company = Auth::user()->company;
+        if ($feedback->feedbackRequest->company_id !== $company->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $feedback->unpin();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback dépinglé',
+            'is_pinned' => false,
+        ]);
+    }
+
+    /**
+     * Supprimer un feedback
+     */
+    public function destroy(Request $request, int $id)
+    {
+        $feedback = Feedback::findOrFail($id);
+        
+        // Vérifier que l'utilisateur appartient à la bonne entreprise
+        $company = Auth::user()->company;
+        if ($feedback->feedbackRequest->company_id !== $company->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Supprimer le feedback
+        $feedback->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Feedback supprimé avec succès',
         ]);
     }
 }

@@ -25,6 +25,7 @@
         "@inertiajs/react": "^2.3.4",
         "@tailwindcss/vite": "^4.1.18",
         "lucide-react": "^0.562.0",
-        "qrcode": "^1.5.4"
+        "qrcode": "^1.5.4",
+        "recharts": "^3.7.0"
     }
 }

@@ -22,11 +22,16 @@ class FeedbackRequest extends Model
         'responded_at',
         'detected_language',
         'feedback_text',
+        'reminder_count',
+        'last_reminder_sent_at',
+        'first_reminder_sent_at',
     ];
 
     protected $casts = [
         'sent_at' => 'datetime',
         'responded_at' => 'datetime',
+        'last_reminder_sent_at' => 'datetime',
+        'first_reminder_sent_at' => 'datetime',
     ];
 
     public function company()

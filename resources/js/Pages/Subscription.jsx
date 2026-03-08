@@ -1,11 +1,15 @@
 import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { CreditCard, TrendingUp, Zap, AlertCircle, Gift, Calendar, Clock } from 'lucide-react';
+import { CreditCard, TrendingUp, Zap, AlertCircle, Gift, Calendar, Clock, AlertTriangle, XCircle } from 'lucide-react';
 
 export default function Subscription({ auth, subscription, credits, plans }) {
     const currentPlan = subscription?.plan;
     const planRank = { free: 0, basic: 1, pro: 2 };
     const currentRank = currentPlan?.slug ? (planRank[currentPlan.slug] ?? -1) : -1;
+    const isPastDue = subscription?.status === 'past_due';
+    const isCanceled = subscription?.status === 'canceled';
+    const cancelAtPeriodEnd = subscription?.cancel_at_period_end === true;
+    const hasStripeSubscription = subscription?.has_stripe_subscription === true;
     const availableUpgradePlans = plans.filter((p) => {
         if (!currentPlan) {
             return true;
@@ -70,7 +74,7 @@ export default function Subscription({ auth, subscription, credits, plans }) {
                     ) : null}
 
                     {/* Alerte si expiration imminente */}
-                    {subscription && daysRemaining !== null && daysRemaining <= 7 && (
+                    {subscription && daysRemaining !== null && daysRemaining <= 7 && !isPastDue && !cancelAtPeriodEnd && (
                         <div className={`border-2 rounded-lg p-6 mb-6 flex items-start gap-3 ${
                             daysRemaining === 0 
                                 ? 'bg-red-50 border-red-300' 
@@ -98,6 +102,59 @@ export default function Subscription({ auth, subscription, credits, plans }) {
                                 }`}>
                                     Renouvelez votre abonnement pour continuer à utiliser Feedora sans interruption.
                                 </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Alerte paiement échoué (past_due) */}
+                    {isPastDue && (
+                        <div className="border-2 border-red-400 bg-red-50 rounded-lg p-6 mb-6 flex items-start gap-3">
+                            <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                            <div>
+                                <p className="font-bold text-red-900">
+                                    🚨 Paiement échoué — Votre abonnement est en attente de régularisation
+                                </p>
+                                <p className="text-sm text-red-800 mt-1">
+                                    Votre dernier paiement a échoué. Veuillez mettre à jour votre méthode de paiement 
+                                    via le portail Stripe pour éviter la suspension de votre abonnement.
+                                </p>
+                                {hasStripeSubscription && (
+                                    <a
+                                        href={route('subscription.portal')}
+                                        className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                                    >
+                                        <CreditCard className="w-4 h-4" />
+                                        Mettre à jour le paiement
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Alerte annulation programmée */}
+                    {cancelAtPeriodEnd && !isCanceled && (
+                        <div className="border-2 border-amber-400 bg-amber-50 rounded-lg p-6 mb-6 flex items-start gap-3">
+                            <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+                            <div>
+                                <p className="font-bold text-amber-900">
+                                    📋 Annulation programmée
+                                </p>
+                                <p className="text-sm text-amber-800 mt-1">
+                                    Votre abonnement sera annulé à la fin de la période en cours
+                                    {daysRemaining !== null && daysRemaining > 0 && (
+                                        <> (dans {daysRemaining} jour{daysRemaining > 1 ? 's' : ''})</>  
+                                    )}. Vous conservez l'accès à toutes les fonctionnalités jusqu'à cette date.
+                                    Vous pouvez réactiver votre abonnement depuis le portail Stripe.
+                                </p>
+                                {hasStripeSubscription && (
+                                    <a
+                                        href={route('subscription.portal')}
+                                        className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                                    >
+                                        <CreditCard className="w-4 h-4" />
+                                        Réactiver l'abonnement
+                                    </a>
+                                )}
                             </div>
                         </div>
                     )}
@@ -265,21 +322,34 @@ export default function Subscription({ auth, subscription, credits, plans }) {
                                 </div>
                             </div>
 
-                            {/* Bouton Gérer Abonnement (non-FREE) */}
-                            {subscription && currentPlan?.slug !== 'free' && (
+                            {/* Bouton Gérer Abonnement (si abonnement Stripe actif) */}
+                            {subscription && hasStripeSubscription && currentPlan?.slug !== 'free' && !isCanceled && (
                                 <div className="mt-6 pt-6 border-t border-gray-200 flex items-center justify-between">
                                     <div>
                                         <p className="text-sm text-gray-600 mb-1">
-                                            Gérez votre abonnement, méthode de paiement, et annulation depuis le portail Stripe
+                                            Gérez votre abonnement, méthode de paiement, factures et annulation depuis le portail Stripe
                                         </p>
                                     </div>
                                     <a
                                         href={route('subscription.portal')}
-                                        className="inline-flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+                                        className={`inline-flex items-center gap-2 px-6 py-3 font-semibold rounded-lg transition-colors ${
+                                            isPastDue 
+                                                ? 'bg-red-600 hover:bg-red-700 text-white'
+                                                : 'bg-gray-600 hover:bg-gray-700 text-white'
+                                        }`}
                                     >
                                         <CreditCard className="w-4 h-4" />
-                                        Gérer l'abonnement
+                                        {isPastDue ? 'Régulariser le paiement' : 'Gérer l\'abonnement'}
                                     </a>
+                                </div>
+                            )}
+
+                            {/* Info pour plan free (pas de Stripe subscription) */}
+                            {currentPlan?.slug === 'free' && !hasStripeSubscription && (
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <p className="text-sm text-gray-500">
+                                        Vous êtes sur le plan gratuit. Upgrader ci-dessous pour débloquer toutes les fonctionnalités.
+                                    </p>
                                 </div>
                             )}
                         </div>

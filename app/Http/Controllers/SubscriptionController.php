@@ -26,6 +26,18 @@ class SubscriptionController extends Controller
             ? max(0, $maxFeedbacks - $feedbacksThisMonth)
             : null;
 
+        // Vérifier si l'abonnement Stripe est en annulation programmée
+        $cancelAtPeriodEnd = false;
+        if ($subscription && $subscription->stripe_subscription_id) {
+            try {
+                $stripe = new StripeClient(config('services.stripe.secret'));
+                $stripeSub = $stripe->subscriptions->retrieve($subscription->stripe_subscription_id);
+                $cancelAtPeriodEnd = $stripeSub->cancel_at_period_end ?? false;
+            } catch (\Throwable $e) {
+                // Si erreur Stripe, on continue sans bloquer
+            }
+        }
+
         return Inertia::render('Subscription', [
             'auth' => [
                 'user' => Auth::user(),
@@ -34,8 +46,9 @@ class SubscriptionController extends Controller
                 'id' => $subscription->id,
                 'plan' => $subscription->plan?->toArray(),
                 'status' => $subscription->status,
-                'starts_at' => $subscription->starts_at,
                 'ends_at' => $subscription->ends_at,
+                'has_stripe_subscription' => !empty($subscription->stripe_subscription_id),
+                'cancel_at_period_end' => $cancelAtPeriodEnd,
                 'limits' => [
                     'feedbacks_used' => $feedbacksThisMonth,
                     'feedbacks_limit' => $maxFeedbacks,
@@ -84,19 +97,23 @@ class SubscriptionController extends Controller
         $plan = Plan::where('id', $planId)->where('is_active', true)->firstOrFail();
         $subscription = $company?->subscription;
 
+        // Les plans payants doivent passer par Stripe Checkout
+        if ($plan->slug !== 'free') {
+            return redirect()->route('subscription.upgrade', ['planId' => $plan->id])
+                ->with('error', 'Pour un plan payant, utilisez le paiement Stripe.');
+        }
+
         // Créer la subscription si elle n'existe pas
         if (!$subscription) {
             $subscription = $company->subscription()->create([
                 'plan_id' => $plan->id,
                 'status' => 'active',
-                'starts_at' => now(),
             ]);
         } else {
             // Mettre à jour le plan
             $subscription->update([
                 'plan_id' => $plan->id,
                 'status' => 'active',
-                'starts_at' => now(),
             ]);
         }
 
@@ -138,17 +155,54 @@ class SubscriptionController extends Controller
             return back()->with('error', 'Aucune subscription trouvée.');
         }
 
-        if (!$company->stripe_customer_id) {
-            return back()->with('error', 'Vous devez payer une première fois pour gérer votre abonnement. Veuillez upgrader vers un plan payant.');
-        }
-
-        if (!$subscription->stripe_subscription_id) {
-            return back()->with('error', 'Abonnement Stripe non configuré. Veuillez contacter le support.');
-        }
-
         $stripe = new StripeClient(config('services.stripe.secret'));
 
         try {
+            // Créer automatiquement le customer Stripe si manquant
+            if (!$company->stripe_customer_id) {
+                $customer = $stripe->customers->create([
+                    'email' => Auth::user()->email,
+                    'name' => $company->name,
+                    'metadata' => [
+                        'company_id' => $company->id,
+                        'user_id' => Auth::id(),
+                    ],
+                ]);
+
+                $company->update(['stripe_customer_id' => $customer->id]);
+                $company->refresh();
+            }
+
+            // Synchroniser l'ID d'abonnement Stripe si manquant
+            if (empty($subscription?->stripe_subscription_id) && !empty($company->stripe_customer_id)) {
+                $stripeSubscriptions = $stripe->subscriptions->all([
+                    'customer' => $company->stripe_customer_id,
+                    'status' => 'all',
+                    'limit' => 10,
+                ]);
+
+                $activeOrLatest = collect($stripeSubscriptions->data ?? [])
+                    ->first(function ($sub) {
+                        return in_array($sub->status ?? null, ['active', 'trialing', 'past_due', 'unpaid'], true);
+                    });
+
+                if (!$activeOrLatest) {
+                    $activeOrLatest = ($stripeSubscriptions->data ?? [])[0] ?? null;
+                }
+
+                if ($activeOrLatest && !empty($subscription)) {
+                    $subscription->update([
+                        'stripe_subscription_id' => $activeOrLatest->id,
+                        'status' => $activeOrLatest->status ?? $subscription->status,
+                        'ends_at' => !empty($activeOrLatest->current_period_end)
+                            ? now()->setTimestamp((int) $activeOrLatest->current_period_end)
+                            : $subscription->ends_at,
+                    ]);
+                    $subscription->refresh();
+                }
+            }
+
+            // Ouvrir le portail général Stripe (gestion factures, méthode paiement, annulation)
             $session = $stripe->billingPortal->sessions->create([
                 'customer' => $company->stripe_customer_id,
                 'return_url' => route('subscription.index'),
@@ -163,4 +217,5 @@ class SubscriptionController extends Controller
             return back()->with('error', 'Erreur d\'accès au portail. ' . $e->getMessage());
         }
     }
+
 }

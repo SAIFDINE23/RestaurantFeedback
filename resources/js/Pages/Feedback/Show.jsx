@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Head, useForm, Link } from '@inertiajs/react';
 import PrimaryButton from '@/Components/PrimaryButton';
+import { Pin } from 'lucide-react';
 
 export default function Show({ token, company, customer, feedback, status, isAdmin }) {
     const { data, setData, post, processing, reset } = useForm({
@@ -9,6 +10,30 @@ export default function Show({ token, company, customer, feedback, status, isAdm
     });
 
     const [hoveredStar, setHoveredStar] = useState(0);
+    const [isPinned, setIsPinned] = useState(feedback?.is_pinned || false);
+    const [isLoadingPin, setIsLoadingPin] = useState(false);
+
+    const handlePin = async () => {
+        if (!feedback?.id) return;
+        setIsLoadingPin(true);
+        try {
+            const endpoint = isPinned ? 'feedback.unpin' : 'feedback.pin';
+            const response = await fetch(route(endpoint, feedback.id), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (response.ok) {
+                setIsPinned(!isPinned);
+            }
+        } catch (error) {
+            console.error('Error pinning feedback:', error);
+        } finally {
+            setIsLoadingPin(false);
+        }
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -135,28 +160,46 @@ export default function Show({ token, company, customer, feedback, status, isAdm
                                 </div>
 
                                 {isAdmin && (
-                                <div className="pt-6 border-t border-gray-200 flex justify-center">
-                                    <Link
-                                        href={route('feedback.replies.index', feedback.id)}
-                                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
-                                                bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow
-                                                hover:from-blue-700 hover:to-indigo-700 transition"
-                                    >
-                                        <svg
-                                            className="w-5 h-5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
+                                <div className="pt-6 border-t border-gray-200 space-y-4">
+                                    <div className="flex gap-3 justify-center">
+                                        <Link
+                                            href={route('feedback.replies.index', feedback.id)}
+                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl
+                                                    bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold shadow
+                                                    hover:from-blue-700 hover:to-indigo-700 transition"
                                         >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M8 10h8m-8 4h6m-9 5h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                                            />
-                                        </svg>
-                                        Répondre au feedback
-                                    </Link>
+                                            <svg
+                                                className="w-5 h-5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M8 10h8m-8 4h6m-9 5h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                                />
+                                            </svg>
+                                            Répondre au feedback
+                                        </Link>
+                                    </div>
+
+                                    {/* Pin Button */}
+                                    <div className="flex gap-3 justify-center pt-3">
+                                        <button
+                                            onClick={handlePin}
+                                            disabled={isLoadingPin}
+                                            className={`inline-flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition ${
+                                                isPinned
+                                                    ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            } disabled:opacity-50`}
+                                        >
+                                            <Pin className="w-5 h-5" fill={isPinned ? 'currentColor' : 'none'} />
+                                            {isPinned ? 'Épinglé' : 'Épingler'}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 

@@ -9,9 +9,21 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    public function company() {
-    return $this->hasOne(Company::class);
-}
+    /**
+     * Get the user's company (1-to-1 relationship)
+     */
+    public function company()
+    {
+        return $this->hasOne(Company::class);
+    }
+
+    /**
+     * Get all companies for this user (many-to-many through pivot table)
+     */
+    public function companies()
+    {
+        return $this->belongsToMany(Company::class, 'company_user');
+    }
 
 
     /** @use HasFactory<\Database\Factories\UserFactory> */

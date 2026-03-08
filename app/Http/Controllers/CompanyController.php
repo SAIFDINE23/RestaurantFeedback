@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class CompanyController extends Controller
@@ -45,20 +46,20 @@ class CompanyController extends Controller
 
     public function updateReviewPlatforms(Request $request)
     {
-        $validated = $request->validate([
-            'google.enabled' => 'required|boolean',
-            'google.url' => 'nullable|url',
-            'tripadvisor.enabled' => 'required|boolean',
-            'tripadvisor.url' => 'nullable|url',
-            'yelp.enabled' => 'required|boolean',
-            'yelp.url' => 'nullable|url',
-            'facebook.enabled' => 'required|boolean',
-            'facebook.url' => 'nullable|url',
-            'trustpilot.enabled' => 'required|boolean',
-            'trustpilot.url' => 'nullable|url',
-            'other.enabled' => 'required|boolean',
-            'other.url' => 'nullable|url',
-        ]);
+        $platforms = [
+            'google', 'facebook', 'tripadvisor', 'lafourchette', 'trustpilot', 
+            'zomato', 'opentable', 'yelp', 'deliveroo', 'ubereats', 'justeat', 
+            'michelin', 'booking', 'petitfute', 'discount', 'restopolis', 
+            'gaultmillau', 'other'
+        ];
+
+        $rules = [];
+        foreach ($platforms as $platform) {
+            $rules["{$platform}.enabled"] = 'required|boolean';
+            $rules["{$platform}.url"] = 'nullable|url';
+        }
+
+        $validated = $request->validate($rules);
 
         $company = $request->user()->company;
         $company->update([
@@ -68,4 +69,43 @@ class CompanyController extends Controller
         return redirect()
             ->route('company.review-platforms.edit')
             ->with('success', 'Configuration des plateformes mise à jour');
-    }}
+    }
+
+    /**
+     * Delete user account and associated company data
+     */
+    public function destroyAccount(Request $request)
+    {
+        $request->validate([
+            'confirmation' => ['required', 'string'],
+        ]);
+
+        // Verify the user typed "SUPPRIMER"
+        if ($request->input('confirmation') !== 'SUPPRIMER') {
+            return back()->withErrors([
+                'confirmation' => 'Veuillez taper "SUPPRIMER" pour confirmer la suppression.'
+            ]);
+        }
+
+        $user = $request->user();
+        $company = $user->company;
+
+        // Delete company and all associated data (via cascading deletes)
+        if ($company) {
+            $company->delete();
+        }
+
+        // Logout user
+        Auth::logout();
+
+        // Delete user account
+        $user->delete();
+
+        // Invalidate session
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/')
+            ->with('success', 'Votre compte a été supprimé avec succès.');
+    }
+}

@@ -36,6 +36,11 @@ class Task extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function radarIssue()
+    {
+        return $this->hasOne(RadarIssue::class);
+    }
+
     // Helper pour obtenir le label du statut
     public function getStatusLabelAttribute()
     {

@@ -33,7 +33,6 @@ class CompanyObserver
                 'company_id' => $company->id,
                 'plan_id' => $freePlan->id,
                 'status' => 'active',
-                'starts_at' => Carbon::now(),
                 'ends_at' => null, // FREE plan n'expire jamais
             ]);
 

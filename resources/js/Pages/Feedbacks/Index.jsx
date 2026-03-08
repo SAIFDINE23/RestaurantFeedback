@@ -2,19 +2,25 @@ import { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Mail, MessageCircle, QrCode, Phone, Eye, Reply, CheckCircle2, Clock, Send, BarChart3 } from 'lucide-react';
+import { Mail, MessageCircle, QrCode, Phone, Eye, Reply, CheckCircle2, Clock, Send, BarChart3, Bell, Pin } from 'lucide-react';
 
 export default function Index({ auth, feedbacks }) {
     const [filterStatus, setFilterStatus] = useState('all');
+    const [filterPin, setFilterPin] = useState('all'); // 'all', 'pinned'
     const [searchTerm, setSearchTerm] = useState('');
+    const [feedbackStates, setFeedbackStates] = useState({});
 
     // Filtrage des feedbacks
     const filteredFeedbacks = feedbacks.data.filter(fb => {
         const matchesStatus = filterStatus === 'all' || fb.status === filterStatus;
+        const matchesPin = 
+            filterPin === 'all' ? true :
+            filterPin === 'pinned' ? fb.feedback?.is_pinned :
+            true;
         const matchesSearch = !searchTerm || 
             fb.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             fb.customer?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesStatus && matchesSearch;
+        return matchesStatus && matchesPin && matchesSearch;
     });
 
     // Stats calculées
@@ -23,6 +29,7 @@ export default function Index({ auth, feedbacks }) {
         sent: feedbacks.data.filter(fb => fb.status === 'sent').length,
         pending: feedbacks.data.filter(fb => fb.status === 'pending').length,
         completed: feedbacks.data.filter(fb => fb.status === 'completed').length,
+        pinned: feedbacks.data.filter(fb => fb.feedback?.is_pinned).length,
     };
 
     return (
@@ -83,27 +90,26 @@ export default function Index({ auth, feedbacks }) {
                 </div>
 
                 {/* Filters Premium */}
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Search Premium */}
-                        <div className="flex-1">
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </div>
-                                <input
-                                    type="text"
-                                    placeholder="Rechercher par client, email..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
-                                />
-                            </div>
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 space-y-6">
+                    {/* Search */}
+                    <div className="relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
                         </div>
+                        <input
+                            type="text"
+                            placeholder="Rechercher par client, email..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-medium"
+                        />
+                    </div>
 
-                        {/* Status Filter Premium */}
+                    {/* Statut Filter */}
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Statut</h3>
                         <div className="flex flex-wrap gap-2">
                             <FilterButton
                                 active={filterStatus === 'all'}
@@ -131,6 +137,25 @@ export default function Index({ auth, feedbacks }) {
                             />
                         </div>
                     </div>
+
+                    {/* Pin Filter */}
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Affichage</h3>
+                        <div className="flex flex-wrap gap-2">
+                            <FilterButton
+                                active={filterPin === 'all'}
+                                onClick={() => setFilterPin('all')}
+                                label="Tous"
+                                gradient="from-gray-600 to-gray-700"
+                            />
+                            <FilterButton
+                                active={filterPin === 'pinned'}
+                                onClick={() => setFilterPin('pinned')}
+                                label={`📌 Épinglés (${stats.pinned})`}
+                                gradient="from-yellow-500 to-yellow-600"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* Feedbacks Table Premium */}
@@ -151,82 +176,11 @@ export default function Index({ auth, feedbacks }) {
                         </div>
                     ) : (
                         <>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                                        <tr>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Client
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Statut
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Canal
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Note
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Commentaire
-                                            </th>
-                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Date
-                                            </th>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {filteredFeedbacks.map((fb) => (
-                                            <tr key={fb.id} className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-colors group">
-                                                <td className="px-6 py-5 whitespace-nowrap">
-                                                    <div className="flex items-center">
-                                                        <div className="relative">
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-full blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
-                                                            <div className="relative w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                                                                {fb.customer?.name?.charAt(0).toUpperCase() || fb.customer?.email?.charAt(0).toUpperCase() || '?'}
-                                                            </div>
-                                                        </div>
-                                                        <div className="ml-4">
-                                                            <div className="text-sm font-bold text-gray-900">
-                                                                {fb.customer?.name || 'Client supprimé'}
-                                                            </div>
-                                                            <div className="text-xs text-gray-500 font-medium">
-                                                                {fb.customer?.email || '—'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-5 whitespace-nowrap">
-                                                    <StatusBadge status={fb.status} />
-                                                </td>
-                                                <td className="px-6 py-5 whitespace-nowrap">
-                                                    <ChannelBadge channel={fb.channel} />
-                                                </td>
-                                                <td className="px-6 py-5 whitespace-nowrap">
-                                                    <Rating value={fb.feedback?.rating} />
-                                                </td>
-                                                <td className="px-6 py-5 max-w-xs">
-                                                    <p className="text-gray-600 text-sm truncate font-medium">
-                                                        {fb.feedback?.comment || '—'}
-                                                    </p>
-                                                </td>
-                                                <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-600 font-semibold">
-                                                    {new Date(fb.created_at).toLocaleDateString('fr-FR', {
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}
-                                                </td>
-                                                <td className="px-6 py-5 whitespace-nowrap text-right">
-                                                    <FeedbackActions feedback={fb} />
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            {/* Grid de cartes Feedbacks */}
+                            <div className="space-y-4">
+                                {filteredFeedbacks.map((fb) => (
+                                    <FeedbackCard key={fb.id} feedback={fb} />
+                                ))}
                             </div>
 
                             {/* Pagination Premium */}
@@ -403,6 +357,295 @@ function Rating({ value }) {
                 ))}
             </div>
             <span className="text-sm font-bold text-gray-900">{value}/5</span>
+        </div>
+    );
+}
+
+function PinButton({ feedback }) {
+    const [isPinned, setIsPinned] = useState(feedback?.feedback?.is_pinned || false);
+    const [isLoadingPin, setIsLoadingPin] = useState(false);
+
+    const handlePin = async () => {
+        if (!feedback?.feedback?.id) return;
+        setIsLoadingPin(true);
+        try {
+            const endpoint = isPinned ? 'feedback.unpin' : 'feedback.pin';
+            const response = await fetch(route(endpoint, feedback.feedback.id), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (response.ok) {
+                setIsPinned(!isPinned);
+            }
+        } catch (error) {
+            console.error('Error pinning feedback:', error);
+        } finally {
+            setIsLoadingPin(false);
+        }
+    };
+
+    return (
+        <div className="flex gap-1">
+            <button
+                onClick={handlePin}
+                disabled={isLoadingPin}
+                className={`p-2 transition-colors ${
+                    isPinned 
+                        ? 'text-yellow-600 hover:text-yellow-700' 
+                        : 'text-gray-400 hover:text-yellow-600'
+                } disabled:opacity-50`}
+                title={isPinned ? 'Dépingler' : 'Épingler'}
+            >
+                <Pin className="w-5 h-5" fill={isPinned ? 'currentColor' : 'none'} />
+            </button>
+        </div>
+    );
+}
+
+function RemindButton({ feedbackRequest }) {
+    const [isSending, setIsSending] = useState(false);
+
+    // Logique d'affichage: seulement si status = sent/pending ET reminder_count < 3 ET pas de feedback
+    const canSendReminder = 
+        (feedbackRequest.status === 'sent' || feedbackRequest.status === 'pending') &&
+        !feedbackRequest.feedback?.id && // Pas de feedback reçu
+        (feedbackRequest.reminder_count || 0) < 3;
+
+    const handleRemind = async () => {
+        if (!confirm('Envoyer un reminder à ce client ?')) return;
+        
+        setIsSending(true);
+        try {
+            const response = await fetch(route('feedback-request.remind', feedbackRequest.id), {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (response.ok) {
+                alert('✅ Reminder envoyé avec succès!');
+                window.location.reload();
+            } else {
+                const data = await response.json();
+                alert('❌ ' + (data.message || 'Erreur lors de l\'envoi du reminder'));
+            }
+        } catch (error) {
+            console.error('Error sending reminder:', error);
+            alert('❌ Erreur lors de l\'envoi du reminder');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    if (!canSendReminder) return null;
+
+    const reminderCount = feedbackRequest.reminder_count || 0;
+
+    return (
+        <button
+            onClick={handleRemind}
+            disabled={isSending}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-bold rounded-full hover:bg-orange-600 transition-all disabled:opacity-50"
+            title="Envoyer un reminder"
+        >
+            <Bell size={16} className={isSending ? 'animate-pulse' : ''} />
+            Relancer
+            {reminderCount > 0 && (
+                <span className="text-xs bg-white/30 px-2 py-0.5 rounded-full">
+                    {reminderCount}/3
+                </span>
+            )}
+        </button>
+    );
+}
+
+function DeleteFeedbackButton({ feedback }) {
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const handleDelete = async () => {
+        if (!confirm('Êtes-vous sûr de vouloir supprimer ce feedback? Cette action est irréversible.')) {
+            return;
+        }
+
+        if (!feedback?.feedback?.id) return;
+        setIsDeleting(true);
+        try {
+            const response = await fetch(route('feedback.destroy', feedback.feedback.id), {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (response.ok) {
+                // Reload page to reflect deletion
+                window.location.reload();
+            } else {
+                alert('Erreur lors de la suppression du feedback');
+            }
+        } catch (error) {
+            console.error('Error deleting feedback:', error);
+            alert('Erreur lors de la suppression du feedback');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 ml-auto"
+            title="Supprimer ce feedback"
+        >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z" />
+            </svg>
+        </button>
+    );
+}
+
+function FeedbackCard({ feedback }) {
+    const getChannelIcon = (channel) => {
+        const icons = {
+            email: '✉️',
+            sms: '📱',
+            qr: '📲',
+        };
+        return icons[channel] || '📍';
+    };
+
+    const getInitials = (name, email) => {
+        if (name) {
+            return name.split(' ').map(n => n.charAt(0)).join('').toUpperCase();
+        }
+        return email?.charAt(0).toUpperCase() || '?';
+    };
+
+    const getAvatarColor = (name) => {
+        const colors = [
+            'bg-orange-500',
+            'bg-blue-500',
+            'bg-indigo-500',
+            'bg-purple-500',
+            'bg-pink-500',
+            'bg-green-500',
+            'bg-red-500',
+            'bg-cyan-500',
+        ];
+        const index = (name?.charCodeAt(0) || 0) % colors.length;
+        return colors[index];
+    };
+
+    const customerName = feedback.customer?.name || 'Client supprimé';
+    const initials = getInitials(customerName, feedback.customer?.email);
+    const avatarColor = getAvatarColor(customerName);
+    const rating = feedback.feedback?.rating;
+    const comment = feedback.feedback?.comment;
+    const createdAt = new Date(feedback.created_at).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+
+    return (
+        <div className={`bg-white border rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow ${
+            feedback.feedback?.is_pinned ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'
+        }`}>
+            {/* Badge épinglé */}
+            {feedback.feedback?.is_pinned && (
+                <div className="flex gap-2 mb-3">
+                    {feedback.feedback?.is_pinned && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700">
+                            <Pin className="w-3 h-3" fill="currentColor" />
+                            Épinglé
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Header: Avatar + Nom + Rating + Date + Source */}
+            <div className="flex items-start gap-4 mb-4">
+                {/* Avatar */}
+                <div className={`flex-shrink-0 w-14 h-14 ${avatarColor} rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md`}>
+                    {initials}
+                </div>
+
+                {/* Infos principales */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                        <h3 className="text-lg font-bold text-gray-900">{customerName}</h3>
+                    </div>
+
+                    {/* Rating */}
+                    {rating && (
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="flex gap-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                    <svg
+                                        key={star}
+                                        className={`w-4 h-4 ${star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                    </svg>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Date + Source */}
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <span>{createdAt}</span>
+                        <span>📍</span>
+                        <span className="font-semibold capitalize">{feedback.channel || 'Inconnu'}</span>
+                    </div>
+                </div>
+
+                {/* Statut */}
+                <StatusBadge status={feedback.status} />
+            </div>
+
+            {/* Commentaire */}
+            {comment && (
+                <p className="text-gray-700 text-base mb-5 leading-relaxed">
+                    {comment}
+                </p>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                {feedback.status === 'completed' && feedback.feedback?.id ? (
+                    <>
+                        <Link
+                            href={route('feedback.adminShow', feedback.feedback?.id)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition-all"
+                        >
+                            <Eye size={16} />
+                            Voir détails
+                        </Link>
+                        <Link
+                            href={route('feedback.replies.index', feedback.feedback?.id)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-full hover:bg-blue-700 transition-all"
+                        >
+                            <Reply size={16} />
+                            Répondre
+                        </Link>
+                        <PinButton feedback={feedback} />
+                        <DeleteFeedbackButton feedback={feedback} />
+                    </>
+                ) : (
+                    <>
+                        <RemindButton feedbackRequest={feedback} />
+                        <span className="text-sm text-gray-400">Feedback en attente de complétude...</span>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

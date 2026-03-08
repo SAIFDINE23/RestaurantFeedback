@@ -2,19 +2,65 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\FeedbackRequest;
-use App\Jobs\GenerateAIReplyJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Auth;
-use App\Mail\FeedbackRequestMail;
 use App\Services\SmsService;
-use App\Services\AIReplyService;
+use App\Services\BrevoService;
+use App\Services\ReminderService;
+use App\Services\FeedbackTemplateService;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class FeedbackRequestController extends Controller
 {
+    public function studio(Request $request, FeedbackTemplateService $templateService)
+    {
+        $company = $request->user()->company;
+
+        $customers = Customer::where('company_id', $company->id)
+            ->with(['feedbackRequests' => fn ($q) => $q->latest()->limit(1)])
+            ->orderByDesc('id')
+            ->get(['id', 'name', 'email', 'phone']);
+
+        return Inertia::render('FeedbackRequests/Studio', [
+            'customers' => $customers,
+            'templates' => $templateService->forCompany($company),
+        ]);
+    }
+
+    public function updateTemplates(Request $request, FeedbackTemplateService $templateService)
+    {
+        $data = $request->validate([
+            'sms_template' => ['required', 'string', 'max:1500'],
+            'email_subject_template' => ['required', 'string', 'max:255'],
+            'email_body_template' => ['required', 'string', 'max:5000'],
+            'qr_template' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        foreach (['sms_template', 'email_subject_template', 'email_body_template'] as $field) {
+            foreach (FeedbackTemplateService::TOKENS as $token) {
+                if (!str_contains($data[$field], $token)) {
+                    return back()->withErrors([
+                        $field => "Le champ doit contenir le placeholder {$token}",
+                    ]);
+                }
+            }
+        }
+
+        $company = $request->user()->company;
+        $company->update([
+            'feedback_sms_template' => $data['sms_template'],
+            'feedback_email_subject_template' => $data['email_subject_template'],
+            'feedback_email_body_template' => $data['email_body_template'],
+            'feedback_qr_template' => $data['qr_template'],
+        ]);
+
+        return back()->with('success', 'Templates mis à jour avec succès.');
+    }
+
     /**
      * Envoyer une demande de feedback (Email ou SMS)
      */
@@ -76,24 +122,51 @@ class FeedbackRequestController extends Controller
          * EMAIL
          * ==========================
          */
-        if ($data['channel'] === 'email') {
+            if ($data['channel'] === 'email') {
             Log::info('Email flow triggered', [
                 'to' => $feedbackRequest->customer->email,
             ]);
 
             try {
-                // Utilisation de send() au lieu de queue() pour passer outre le Worker
-                Mail::to($feedbackRequest->customer->email)
-                    ->send(new FeedbackRequestMail($feedbackRequest));
+                $templateService = app(FeedbackTemplateService::class);
+                $brevoService = new BrevoService();
+                $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
+                $templates = $templateService->forCompany($feedbackRequest->company);
+                $variables = $this->templateVariables($feedbackRequest, $link);
+                $subject = $templateService->render($templates['email_subject_template'], $variables);
+                $emailBody = $templateService->render($templates['email_body_template'], $variables);
+                
+                $htmlContent = view('emails.feedback-request-custom', [
+                    'customerName' => $feedbackRequest->customer->name,
+                    'companyName' => $feedbackRequest->company->name,
+                    'feedbackLink' => $variables['{{feedback_link}}'],
+                    'emailBody' => $emailBody,
+                    'companyLogo' => $feedbackRequest->company->logo_url,
+                ])->render();
 
-                $feedbackRequest->update([
-                    'status' => 'sent',
-                    'sent_at' => now(),
-                ]);
+                $success = $brevoService->sendEmail(
+                    [
+                        'email' => $feedbackRequest->customer->email,
+                        'name' => $feedbackRequest->customer->name,
+                    ],
+                            $subject,
+                    $htmlContent
+                );
 
-                Log::info('Email sent successfully (Sync)', [
-                    'to' => $feedbackRequest->customer->email,
-                ]);
+                if ($success) {
+                    $feedbackRequest->update([
+                        'status' => 'sent',
+                        'sent_at' => now(),
+                        'provider' => 'brevo',
+                    ]);
+
+                    Log::info('Email sent successfully via Brevo', [
+                        'to' => $feedbackRequest->customer->email,
+                        'feedback_request_id' => $feedbackRequest->id,
+                    ]);
+                } else {
+                    throw new \Exception('Brevo email service returned false');
+                }
             } catch (\Throwable $e) {
                 $feedbackRequest->update([
                     'status' => 'failed',
@@ -102,13 +175,15 @@ class FeedbackRequestController extends Controller
                 Log::error('Email failed', [
                     'to' => $feedbackRequest->customer->email,
                     'error' => $e->getMessage(),
+                    'feedback_request_id' => $feedbackRequest->id,
                 ]);
 
                 return back()->withErrors([
-                    'email' => 'Erreur lors de l’envoi de l’email : ' . $e->getMessage()
+                    'email' => 'Erreur lors de l\'envoi de l\'email : ' . $e->getMessage()
                 ]);
             }
         }
+
 
         /**
          * ==========================
@@ -140,11 +215,17 @@ class FeedbackRequestController extends Controller
 
             try {
                 $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
+                $templateService = app(FeedbackTemplateService::class);
+                $templates = $templateService->forCompany($feedbackRequest->company);
+                $smsBody = $templateService->render(
+                    $templates['sms_template'],
+                    $this->templateVariables($feedbackRequest, $link)
+                );
 
                 // 📱 Envoyer SMS avec vérification/consommation de crédits
                 $sms = app(SmsService::class)->sendWithCredits(
                     $feedbackRequest->customer->phone,
-                    "Bonjour 👋\nMerci de donner votre avis : " . $link,
+                    $smsBody,
                     $subscription // Passer la subscription pour la gestion des crédits
                 );
 
@@ -246,12 +327,40 @@ class FeedbackRequestController extends Controller
                 // 📧 EMAIL
                 if ($data['channel'] === 'email') {
                     try {
-                        Mail::to($feedbackRequest->customer->email)
-                            ->send(new FeedbackRequestMail($feedbackRequest));
+                        $templateService = app(FeedbackTemplateService::class);
+                        $brevoService = new BrevoService();
+                        $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
+                        $templates = $templateService->forCompany($feedbackRequest->company);
+                        $variables = $this->templateVariables($feedbackRequest, $link);
+
+                        $subject = $templateService->render($templates['email_subject_template'], $variables);
+                        $emailBody = $templateService->render($templates['email_body_template'], $variables);
+
+                        $htmlContent = view('emails.feedback-request-custom', [
+                            'customerName' => $feedbackRequest->customer->name,
+                            'companyName' => $feedbackRequest->company->name,
+                            'feedbackLink' => $variables['{{feedback_link}}'],
+                            'emailBody' => $emailBody,
+                            'companyLogo' => $feedbackRequest->company->logo_url,
+                        ])->render();
+
+                        $success = $brevoService->sendEmail(
+                            [
+                                'email' => $feedbackRequest->customer->email,
+                                'name' => $feedbackRequest->customer->name,
+                            ],
+                            $subject,
+                            $htmlContent
+                        );
+
+                        if (!$success) {
+                            throw new \Exception('Brevo email service returned false');
+                        }
 
                         $feedbackRequest->update([
                             'status' => 'sent',
                             'sent_at' => now(),
+                            'provider' => 'brevo',
                         ]);
                         $successCount++;
                     } catch (\Throwable $e) {
@@ -278,14 +387,21 @@ class FeedbackRequestController extends Controller
 
                     try {
                         $link = rtrim(config('app.url'), '/') . '/feedback/' . $feedbackRequest->token;
+                        $templateService = app(FeedbackTemplateService::class);
+                        $templates = $templateService->forCompany($feedbackRequest->company);
+
+                        $smsBody = $templateService->render(
+                            $templates['sms_template'],
+                            $this->templateVariables($feedbackRequest, $link)
+                        );
                         
-                        // 💳 Utiliser sendWithCredits pour vérifier et consommer les crédits
+                        // \u{1F4B3} Utiliser sendWithCredits pour v\u{E9}rifier et consommer les cr\u{E9}dits
                         $company = Auth::user()->company;
                         $subscription = $company?->subscription;
                         
                         $sms = app(SmsService::class)->sendWithCredits(
                             $feedbackRequest->customer->phone,
-                            "Bonjour 👋\nMerci de donner votre avis : " . $link,
+                            $smsBody,
                             $subscription
                         );
 
@@ -340,4 +456,111 @@ class FeedbackRequestController extends Controller
         }
 
         return back()->with('success', $message);
-    }}
+    }
+
+    private function templateVariables(FeedbackRequest $feedbackRequest, string $link): array
+    {
+        return [
+            '{{customer_name}}' => $feedbackRequest->customer->name ?: 'client',
+            '{{company_name}}' => $feedbackRequest->company->name ?: 'notre équipe',
+            '{{feedback_link}}' => $link,
+        ];
+    }
+
+    /**
+     * Envoyer un reminder pour un feedbackRequest non répondu
+     */
+    public function sendReminder(Request $request, int $feedbackRequestId)
+    {
+        $feedbackRequest = FeedbackRequest::findOrFail($feedbackRequestId);
+
+        // Vérifier que l'utilisateur appartient à la bonne company
+        $company = Auth::user()->company;
+        if ($feedbackRequest->company_id !== $company->id) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        // Vérifier que le feedbackRequest n'a pas encore de feedback
+        if ($feedbackRequest->feedback()->exists()) {
+            return response()->json(['success' => false, 'message' => 'Un feedback a déjà été reçu pour cette demande'], 400);
+        }
+
+        // Vérifier le statut
+        if (!in_array($feedbackRequest->status, ['pending', 'sent'])) {
+            return response()->json(['success' => false, 'message' => 'Cette demande de feedback ne peut pas recevoir de rappel'], 400);
+        }
+
+        // Envoyer le reminder via ReminderService
+        $reminderService = new ReminderService();
+        $success = $reminderService->sendReminder($feedbackRequest, maxReminders: 3);
+
+        if ($success) {
+            // Recharger pour avoir les données mises à jour
+            $feedbackRequest->refresh();
+            
+            Log::info('Reminder sent successfully', [
+                'feedback_request_id' => $feedbackRequestId,
+                'channel' => $feedbackRequest->channel,
+                'reminder_count' => $feedbackRequest->reminder_count,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Rappel envoyé avec succès via ' . strtoupper($feedbackRequest->channel),
+                'reminder_count' => $feedbackRequest->reminder_count,
+            ]);
+        } else {
+            Log::warning('Reminder send failed', [
+                'feedback_request_id' => $feedbackRequestId,
+                'reason' => 'Service returned false or validation failed',
+            ]);
+
+            // Vérifier si un message d'erreur spécifique a été défini par le service
+            $errorMessage = $feedbackRequest->reminder_error_message ?? 'Impossible d\'envoyer le rappel. Vérifiez les conditions (max 3 rappels, délai minimum 72h)';
+
+            return response()->json([
+                'success' => false,
+                'message' => $errorMessage
+            ], 400);
+        }
+    }
+
+    /**
+     * Envoyer des reminders en masse
+     */
+    public function sendAllReminders(Request $request)
+    {
+        $company = Auth::user()->company;
+
+        Log::info('Batch reminders requested', [
+            'user_id' => Auth::id(),
+            'company_id' => $company->id,
+        ]);
+
+        $reminderService = new ReminderService();
+        $stats = $reminderService->sendAllReminders(maxReminders: 3, companyId: $company->id);
+
+        // Message détaillé avec statut
+        $message = "Total: {$stats['total']} | Envoyés: {$stats['sent']}";
+        
+        if ($stats['skipped'] > 0) {
+            $message .= " | Ignorés: {$stats['skipped']}";
+        }
+        
+        if ($stats['failed'] > 0) {
+            $message .= " | Erreurs: {$stats['failed']}";
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'stats' => [
+                'total' => $stats['total'],
+                'sent' => $stats['sent'],
+                'failed' => $stats['failed'],
+                'skipped' => $stats['skipped'],
+            ],
+            'details' => $stats['details'],
+        ], 200);
+    }
+}

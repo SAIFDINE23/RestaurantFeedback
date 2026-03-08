@@ -1,59 +1,154 @@
 import { Head, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useState } from 'react';
-import { Globe, Check, X, ExternalLink, HelpCircle, Star, AlertCircle } from 'lucide-react';
+import { Globe, Check, X, ExternalLink, HelpCircle, Star, AlertCircle, Search } from 'lucide-react';
+import { getPlatformLogo } from '@/Components/PlatformLogos';
 
 export default function ReviewPlatforms({ auth, company }) {
     const platforms = [
         {
             id: 'google',
             name: 'Google',
-            icon: '🔍',
             color: 'from-blue-500 to-blue-600',
             helpUrl: 'https://support.google.com/business/answer/7035772',
             placeholder: 'https://g.page/r/VOTRE_ID/review',
-            description: 'La plateforme la plus populaire pour les recherches locales'
-        },
-        {
-            id: 'tripadvisor',
-            name: 'TripAdvisor',
-            icon: '🦉',
-            color: 'from-green-500 to-green-600',
-            helpUrl: 'https://www.tripadvisorsupport.com/hc/fr',
-            placeholder: 'https://www.tripadvisor.com/UserReview-g...',
-            description: 'Idéal pour restaurants et activités touristiques'
-        },
-        {
-            id: 'yelp',
-            name: 'Yelp',
-            icon: '⭐',
-            color: 'from-red-500 to-red-600',
-            helpUrl: 'https://www.yelp.com/support',
-            placeholder: 'https://www.yelp.com/writeareview/biz/...',
-            description: 'Très populaire aux États-Unis et Canada'
+            description: 'La plateforme la plus populaire pour les recherches locales',
+            popular: true
         },
         {
             id: 'facebook',
             name: 'Facebook',
-            icon: '👍',
             color: 'from-blue-600 to-indigo-600',
             helpUrl: 'https://www.facebook.com/business/help',
             placeholder: 'https://www.facebook.com/NomDuRestaurant/reviews',
-            description: 'Avis sur votre page Facebook professionnelle'
+            description: 'Avis sur votre page Facebook professionnelle',
+            popular: true
+        },
+        {
+            id: 'tripadvisor',
+            name: 'TripAdvisor',
+            color: 'from-green-500 to-green-600',
+            helpUrl: 'https://www.tripadvisorsupport.com/hc/fr',
+            placeholder: 'https://www.tripadvisor.com/UserReview-g...',
+            description: 'Idéal pour restaurants et activités touristiques',
+            popular: true
+        },
+        {
+            id: 'lafourchette',
+            name: 'LaFourchette',
+            color: 'from-teal-400 to-teal-600',
+            helpUrl: 'https://www.thefork.fr/restaurant',
+            placeholder: 'https://www.thefork.fr/restaurant/...',
+            description: 'Leader de la réservation en ligne en France',
+            popular: true
         },
         {
             id: 'trustpilot',
             name: 'Trustpilot',
-            icon: '🛡️',
             color: 'from-teal-500 to-cyan-600',
             helpUrl: 'https://support.trustpilot.com',
             placeholder: 'https://www.trustpilot.com/evaluate/...',
             description: 'Plateforme de confiance B2C reconnue'
         },
         {
+            id: 'zomato',
+            name: 'Zomato',
+            color: 'from-red-500 to-red-600',
+            helpUrl: 'https://www.zomato.com',
+            placeholder: 'https://www.zomato.com/...',
+            description: 'Découverte et avis de restaurants'
+        },
+        {
+            id: 'opentable',
+            name: 'OpenTable',
+            color: 'from-red-600 to-red-700',
+            helpUrl: 'https://www.opentable.fr',
+            placeholder: 'https://www.opentable.fr/...',
+            description: 'Réservation et avis de restaurants'
+        },
+        {
+            id: 'yelp',
+            name: 'Yelp',
+            color: 'from-red-500 to-red-600',
+            helpUrl: 'https://www.yelp.com/support',
+            placeholder: 'https://www.yelp.com/writeareview/biz/...',
+            description: 'Très populaire aux États-Unis et Canada'
+        },
+        {
+            id: 'deliveroo',
+            name: 'Deliveroo',
+            color: 'from-cyan-400 to-cyan-600',
+            helpUrl: 'https://www.deliveroo.fr',
+            placeholder: 'https://deliveroo.fr/fr/menu/...',
+            description: 'Plateforme de livraison de repas'
+        },
+        {
+            id: 'ubereats',
+            name: 'Uber Eats',
+            color: 'from-green-500 to-green-600',
+            helpUrl: 'https://www.ubereats.com',
+            placeholder: 'https://www.ubereats.com/store/...',
+            description: 'Livraison de repas rapide'
+        },
+        {
+            id: 'justeat',
+            name: 'Just Eat',
+            color: 'from-orange-500 to-orange-600',
+            helpUrl: 'https://www.just-eat.fr',
+            placeholder: 'https://www.just-eat.fr/restaurants-...',
+            description: 'Commande de repas en ligne'
+        },
+        {
+            id: 'michelin',
+            name: 'Guide Michelin',
+            color: 'from-yellow-400 to-yellow-600',
+            helpUrl: 'https://guide.michelin.com',
+            placeholder: 'https://guide.michelin.com/fr/fr/restaurant/...',
+            description: 'Le guide gastronomique de référence'
+        },
+        {
+            id: 'booking',
+            name: 'Booking.com',
+            color: 'from-blue-700 to-blue-900',
+            helpUrl: 'https://www.booking.com',
+            placeholder: 'https://www.booking.com/hotel/...',
+            description: 'Réservations et avis d\'hébergement'
+        },
+        {
+            id: 'petitfute',
+            name: 'Petit Futé',
+            color: 'from-red-600 to-red-800',
+            helpUrl: 'https://www.petitfute.com',
+            placeholder: 'https://www.petitfute.com/...',
+            description: 'Guide touristique français'
+        },
+        {
+            id: 'discount',
+            name: 'Discount',
+            color: 'from-orange-500 to-orange-700',
+            helpUrl: 'https://www.discount.fr',
+            placeholder: 'https://www.discount.fr/...',
+            description: 'Bons plans restaurants'
+        },
+        {
+            id: 'restopolis',
+            name: 'Restopolis',
+            color: 'from-orange-600 to-red-600',
+            helpUrl: 'https://www.restopolis.fr',
+            placeholder: 'https://www.restopolis.fr/...',
+            description: 'Annuaire de restaurants'
+        },
+        {
+            id: 'gaultmillau',
+            name: 'Gault&Millau',
+            color: 'from-red-700 to-red-900',
+            helpUrl: 'https://www.gaultmillau.com',
+            placeholder: 'https://www.gaultmillau.com/...',
+            description: 'Guide gastronomique français'
+        },
+        {
             id: 'other',
             name: 'Autre',
-            icon: '🌐',
             color: 'from-purple-500 to-pink-600',
             helpUrl: null,
             placeholder: 'URL de votre plateforme personnalisée',
@@ -72,6 +167,13 @@ export default function ReviewPlatforms({ auth, company }) {
 
     const { data, setData, post, processing, errors } = useForm(initialData);
     const [showHelp, setShowHelp] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Filtrer les plateformes selon la recherche
+    const filteredPlatforms = platforms.filter(platform =>
+        platform.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        platform.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const handleToggle = (platformId) => {
         setData(platformId, {
@@ -134,7 +236,7 @@ export default function ReviewPlatforms({ auth, company }) {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-6">
                         <div className="flex items-start">
                             <Star className="h-6 w-6 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-                            <div>
+                            <div className="flex-1">
                                 <h3 className="font-semibold text-blue-900 mb-2">Comment ça fonctionne ?</h3>
                                 <ul className="text-sm text-blue-800 space-y-1">
                                     <li>• Activez les plateformes que vous utilisez</li>
@@ -146,9 +248,37 @@ export default function ReviewPlatforms({ auth, company }) {
                         </div>
                     </div>
 
+                    {/* Barre de recherche */}
+                    <div className="mb-6">
+                        <div className="relative max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Rechercher une plateforme..."
+                                className="w-full pl-12 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            )}
+                        </div>
+                        {searchQuery && (
+                            <p className="mt-2 text-sm text-gray-600">
+                                {filteredPlatforms.length} plateforme{filteredPlatforms.length > 1 ? 's' : ''} trouvée{filteredPlatforms.length > 1 ? 's' : ''}
+                            </p>
+                        )}
+                    </div>
+
                     <form onSubmit={handleSubmit}>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                            {platforms.map((platform) => {
+                            {filteredPlatforms.map((platform) => {
                                 const status = getStatus(platform);
                                 const isEnabled = data[platform.id].enabled;
                                 
@@ -163,11 +293,20 @@ export default function ReviewPlatforms({ auth, company }) {
                                         <div className={`bg-gradient-to-r ${platform.color} p-4 rounded-t-lg`}>
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center space-x-3">
-                                                    <span className="text-3xl">{platform.icon}</span>
+                                                    <div className="bg-white rounded-lg p-2">
+                                                        {getPlatformLogo(platform.id, "w-8 h-8")}
+                                                    </div>
                                                     <div>
-                                                        <h3 className="font-bold text-white text-lg">
-                                                            {platform.name}
-                                                        </h3>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="font-bold text-white text-lg">
+                                                                {platform.name}
+                                                            </h3>
+                                                            {platform.popular && (
+                                                                <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                                                                    Populaire
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-white/90 text-sm">
                                                             {platform.description}
                                                         </p>
@@ -264,8 +403,9 @@ export default function ReviewPlatforms({ auth, company }) {
                                     <ul className="text-sm text-amber-800 space-y-1">
                                         <li>✓ Activez au minimum 2-3 plateformes pour maximiser vos avis</li>
                                         <li>✓ Testez chaque lien avant de sauvegarder</li>
-                                        <li>✓ Google et Facebook sont les plus utilisés en France</li>
+                                        <li>✓ Google, Facebook et LaFourchette sont les plus utilisés en France</li>
                                         <li>✓ Les clients doivent avoir un compte sur la plateforme pour laisser un avis</li>
+                                        <li>✓ Privilégiez les plateformes sur lesquelles vous êtes déjà inscrit</li>
                                     </ul>
                                 </div>
                             </div>

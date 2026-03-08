@@ -16,9 +16,14 @@ class Company extends Model
         'google_place_id',
         'google_review_url',
         'stripe_customer_id',
+        'qr_code_token',
         'logo_url',
         'design_settings',
         'review_platforms',
+        'feedback_sms_template',
+        'feedback_email_subject_template',
+        'feedback_email_body_template',
+        'feedback_qr_template',
     ];
 
     protected $casts = [
@@ -117,5 +122,25 @@ class Company extends Model
     public function getSmsQuotaMonthly(): int
     {
         return $this->currentPlan()?->sms_quota_monthly ?? 0;
+    }
+
+    /**
+     * Génère un token unique pour le QR code si absent
+     */
+    public function generateQrCodeToken(): string
+    {
+        if (!$this->qr_code_token) {
+            $this->qr_code_token = \Illuminate\Support\Str::random(32);
+            $this->save();
+        }
+        return $this->qr_code_token;
+    }
+
+    /**
+     * Récupère l'URL du formulaire public
+     */
+    public function getPublicFormUrl(): string
+    {
+        return route('public.form.show', ['token' => $this->qr_code_token ?? $this->generateQrCodeToken()]);
     }
 }

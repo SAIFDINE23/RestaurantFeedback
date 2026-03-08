@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle, Star, Heart, Sparkles, ExternalLink } from 'lucide-react';
+import { getPlatformLogo } from '@/Components/PlatformLogos';
 
 export default function ThankYou({ rating, googleUrl, company, reviewPlatforms }) {
     const [isVisible, setIsVisible] = useState(false);
@@ -13,42 +14,108 @@ export default function ThankYou({ rating, googleUrl, company, reviewPlatforms }
         {
             id: 'google',
             name: 'Google',
-            icon: '🔍',
             color: 'from-blue-500 to-blue-600',
             subtitle: 'Avis Google Maps'
         },
         {
-            id: 'tripadvisor',
-            name: 'TripAdvisor',
-            icon: '🦉',
-            color: 'from-green-500 to-green-600',
-            subtitle: 'Avis voyageurs'
-        },
-        {
-            id: 'yelp',
-            name: 'Yelp',
-            icon: '⭐',
-            color: 'from-red-500 to-red-600',
-            subtitle: 'Recommandations'
-        },
-        {
             id: 'facebook',
             name: 'Facebook',
-            icon: '👍',
             color: 'from-blue-600 to-indigo-600',
             subtitle: 'Page Facebook'
         },
         {
+            id: 'tripadvisor',
+            name: 'TripAdvisor',
+            color: 'from-green-500 to-green-600',
+            subtitle: 'Avis voyageurs'
+        },
+        {
+            id: 'lafourchette',
+            name: 'LaFourchette',
+            color: 'from-teal-400 to-teal-600',
+            subtitle: 'Réservation restaurant'
+        },
+        {
             id: 'trustpilot',
             name: 'Trustpilot',
-            icon: '🛡️',
             color: 'from-teal-500 to-cyan-600',
             subtitle: 'Avis certifiés'
         },
         {
+            id: 'zomato',
+            name: 'Zomato',
+            color: 'from-red-500 to-red-600',
+            subtitle: 'Avis restaurants'
+        },
+        {
+            id: 'opentable',
+            name: 'OpenTable',
+            color: 'from-red-600 to-red-700',
+            subtitle: 'Réservation'
+        },
+        {
+            id: 'yelp',
+            name: 'Yelp',
+            color: 'from-red-500 to-red-600',
+            subtitle: 'Recommandations'
+        },
+        {
+            id: 'deliveroo',
+            name: 'Deliveroo',
+            color: 'from-cyan-400 to-cyan-600',
+            subtitle: 'Livraison'
+        },
+        {
+            id: 'ubereats',
+            name: 'Uber Eats',
+            color: 'from-green-500 to-green-600',
+            subtitle: 'Livraison'
+        },
+        {
+            id: 'justeat',
+            name: 'Just Eat',
+            color: 'from-orange-500 to-orange-600',
+            subtitle: 'Commande en ligne'
+        },
+        {
+            id: 'michelin',
+            name: 'Guide Michelin',
+            color: 'from-yellow-400 to-yellow-600',
+            subtitle: 'Guide gastronomique'
+        },
+        {
+            id: 'booking',
+            name: 'Booking.com',
+            color: 'from-blue-700 to-blue-900',
+            subtitle: 'Réservations'
+        },
+        {
+            id: 'petitfute',
+            name: 'Petit Futé',
+            color: 'from-red-600 to-red-800',
+            subtitle: 'Guide touristique'
+        },
+        {
+            id: 'discount',
+            name: 'Discount',
+            color: 'from-orange-500 to-orange-700',
+            subtitle: 'Bons plans'
+        },
+        {
+            id: 'restopolis',
+            name: 'Restopolis',
+            color: 'from-orange-600 to-red-600',
+            subtitle: 'Annuaire resto'
+        },
+        {
+            id: 'gaultmillau',
+            name: 'Gault&Millau',
+            color: 'from-red-700 to-red-900',
+            subtitle: 'Guide gastronomique'
+        },
+        {
             id: 'other',
             name: 'Autre',
-            icon: '🌐',
             color: 'from-purple-500 to-pink-600',
             subtitle: 'Plateforme d\'avis'
         }
@@ -155,7 +222,9 @@ export default function ThankYou({ rating, googleUrl, company, reviewPlatforms }
                                                 <div className={`absolute inset-0 bg-gradient-to-r ${platform.color} opacity-0 group-hover:opacity-100 transition-opacity duration-300 brightness-110`}></div>
                                                 
                                                 <div className="relative flex items-center gap-3">
-                                                    <span className="text-3xl">{platform.icon}</span>
+                                                    <div className="bg-white rounded-lg p-2 shadow-md">
+                                                        {getPlatformLogo(platform.id, "w-8 h-8")}
+                                                    </div>
                                                     <div className="text-left">
                                                         <div className="text-base font-bold text-white">{platform.name}</div>
                                                         <div className="text-xs text-white/80">{platform.subtitle}</div>

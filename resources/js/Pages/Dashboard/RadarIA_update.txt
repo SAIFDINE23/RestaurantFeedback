@@ -1,0 +1,9 @@
+// À la fin avant return, ajouter le modal:
+
+{resolutionModal && (
+    <FeedbackResolutionModal 
+        feedback={resolutionModal.context?.evidence ? { comment: resolutionModal.detail, id: resolutionModal.id } : null}
+        onClose={() => setResolutionModal(null)}
+        onResolve={handleResolveConfirm}
+    />
+)}

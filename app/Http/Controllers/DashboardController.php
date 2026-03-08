@@ -5,56 +5,26 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Feedback;
 use App\Models\FeedbackRequest;
+use App\Models\RadarIssue;
 use App\Services\RadarAnalysisService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class DashboardController extends Controller
 {
     public function index()
     {
         $company = Auth::user()->company;
-        $customers = Customer::where('company_id', $company->id)
-        ->withCount([
-        'feedbackRequests as total_feedbacks',
-        'feedbackRequests as completed_feedbacks' => function ($q) {
-            $q->where('status', 'completed');
-        }
-    ])
-    ->latest()
-    ->get()
-    ->map(fn($c) => [
-        'id' => $c->id,
-        'name' => $c->name,
-        'email' => $c->email,
-        'phone' => $c->phone,
-        'total_feedbacks' => $c->total_feedbacks,
-        'completed_feedbacks' => $c->completed_feedbacks,
-    ]);
-
-        $feedbacks = FeedbackRequest::where('company_id', $company->id)
-        ->whereHas('customer')
-        ->with(['customer', 'feedback'])
-        ->latest()
-        ->get()
-        ->map(fn ($f) => [
-        'id' => $f->id,
-        'feedback_id' => $f->feedback?->id,
-        'token' => $f->token,
-        'customer' => [
-            'id' => $f->customer->id,
-            'name' => $f->customer->name,
-        ],
-        'status' => $f->status,
-        'rating' => $f->feedback?->rating,
-        'created_at' => $f->created_at->format('Y-m-d H:i'),
-    ]);
-
         $now = now();
         $last7 = now()->subDays(7);
+        $last30 = now()->subDays(30);
+        $lastWeek = now()->subDays(7)->startOfDay();
 
+        // ============= KPIs EXECUTIFS =============
         $requestsTotal = FeedbackRequest::where('company_id', $company->id)->count();
         $requestsLast7 = FeedbackRequest::where('company_id', $company->id)
             ->whereBetween('created_at', [$last7, $now])
@@ -66,61 +36,180 @@ class DashboardController extends Controller
             ->where('status', 'completed')
             ->whereBetween('created_at', [$last7, $now])
             ->count();
+        $sentTotal = FeedbackRequest::where('company_id', $company->id)
+            ->whereIn('status', ['sent', 'pending'])
+            ->count();
         $failedTotal = FeedbackRequest::where('company_id', $company->id)
             ->where('status', 'failed')
             ->count();
-        $pendingTotal = FeedbackRequest::where('company_id', $company->id)
-            ->whereIn('status', ['sent', 'pending'])
-            ->count();
 
-        $responseRate = $requestsTotal > 0
-            ? round(($completedTotal / $requestsTotal) * 100, 1)
-            : 0;
-        $responseRate7d = $requestsLast7 > 0
-            ? round(($completedLast7 / $requestsLast7) * 100, 1)
-            : 0;
+        $responseRate = $requestsTotal > 0 ? round(($completedTotal / $requestsTotal) * 100, 1) : 0;
+        $responseRate7d = $requestsLast7 > 0 ? round(($completedLast7 / $requestsLast7) * 100, 1) : 0;
 
-        $ratings = collect([1, 2, 3, 4, 5])->mapWithKeys(function ($star) use ($feedbacks) {
-            return [
-                $star => $feedbacks->where('rating', $star)->count()
-            ];
-        });
+        // Tempo moyen de réponse
+        $responseTimes = FeedbackRequest::where('company_id', $company->id)
+            ->whereNotNull('created_at')
+            ->where('status', 'completed')
+            ->selectRaw('EXTRACT(EPOCH FROM (updated_at - created_at)) / 3600 as hours_diff')
+            ->pluck('hours_diff')
+            ->filter();
+        $avgResponseHours = $responseTimes->count() > 0 ? round($responseTimes->avg(), 2) : null;
 
-        $positiveCount = $feedbacks->whereIn('rating', [4, 5])->count();
-        $negativeCount = $feedbacks->whereIn('rating', [1, 2])->count();
-        $neutralCount = $feedbacks->where('rating', 3)->count();
+        // ============= FEEDBACKS & RATINGS =============
+        $feedbacks = FeedbackRequest::where('company_id', $company->id)
+            ->whereHas('customer')
+            ->with(['customer', 'feedback'])
+            ->latest()
+            ->get();
 
-        $avgRating = $feedbacks->whereNotNull('rating')->avg('rating');
+        $positiveCount = $feedbacks->filter(fn($f) => $f->feedback?->rating && $f->feedback->rating >= 4)->count();
+        $negativeCount = $feedbacks->filter(fn($f) => $f->feedback?->rating && $f->feedback->rating <= 2)->count();
+        $neutralCount = $feedbacks->filter(fn($f) => $f->feedback?->rating == 3)->count();
+
+        $avgRating = $feedbacks->whereNotNull('feedback.rating')->pluck('feedback.rating')->avg();
         $avgRating = $avgRating ? round((float) $avgRating, 2) : null;
 
-        $promoters = $feedbacks->where('rating', 5)->count();
-        $detractors = $feedbacks->whereIn('rating', [1, 2])->count();
-        $nps = $completedTotal > 0
-            ? round((($promoters - $detractors) / $completedTotal) * 100, 1)
-            : 0;
+        $promoters = $feedbacks->filter(fn($f) => $f->feedback?->rating == 5)->count();
+        $detractors = $feedbacks->filter(fn($f) => $f->feedback?->rating && $f->feedback->rating <= 2)->count();
+        $nps = $completedTotal > 0 ? round((($promoters - $detractors) / $completedTotal) * 100, 1) : 0;
 
-        $stats = [
-            'customers' => $customers->count(),
-            'feedbacks_total' => $feedbacks->count(),
-            'feedbacks_completed' => $completedTotal,
-            'feedbacks_sent' => $pendingTotal,
-            'feedbacks_failed' => $failedTotal,
-            'requests_total' => $requestsTotal,
-            'requests_last_7d' => $requestsLast7,
-            'completed_last_7d' => $completedLast7,
-            'response_rate' => $responseRate,
-            'response_rate_7d' => $responseRate7d,
-            'avg_rating' => $avgRating,
-            'nps' => $nps,
-            'positive_count' => $positiveCount,
-            'negative_count' => $negativeCount,
-            'neutral_count' => $neutralCount,
-            'ratings' => $ratings,
-            'channel_email' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'email')->count(),
-            'channel_sms' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'sms')->count(),
-            'channel_whatsapp' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'whatsapp')->count(),
-            'channel_qr' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'qr')->count(),
+        // ============= ALERTES URGENTES =============
+        // 1. Feedbacks critiques (négatifs sans réponse)
+        $criticalFeedbacks = FeedbackRequest::where('company_id', $company->id)
+            ->whereHas('feedback', function($q) {
+                $q->where('rating', '<=', 2);
+            })
+            ->where(function($q) {
+                $q->whereNull('responded_at')
+                  ->orWhere('responded_at', null);
+            })
+            ->with(['customer', 'feedback'])
+            ->orderBy('created_at', 'asc')
+            ->take(5)
+            ->get()
+            ->map(fn($f) => [
+                'id' => $f->id,
+                'customer_name' => $f->customer->name,
+                'rating' => $f->feedback?->rating,
+                'days_waiting' => $f->created_at->diffInDays($now),
+                'comment_preview' => $f->feedback ? str($f->feedback->comment)->limit(80)->toString() : null,
+            ]);
+
+        // 2. Clients attendant depuis longtemps
+        $overdueFeedbacks = FeedbackRequest::where('company_id', $company->id)
+            ->whereIn('status', ['sent', 'pending'])
+            ->where('created_at', '<', $last30->subDays(3))
+            ->with(['customer', 'feedback'])
+            ->latest()
+            ->take(5)
+            ->get()
+            ->map(fn($f) => [
+                'id' => $f->id,
+                'customer_name' => $f->customer->name,
+                'days_since_sent' => $f->created_at->diffInDays($now),
+            ]);
+
+        // 3. Crédits SMS restants - De la subscription de la company
+        $smsCredits = null;
+        try {
+            $creditService = app(\App\Services\CreditConsumptionService::class);
+            $subscription = $company->subscription;
+            
+            if ($subscription) {
+                $creditsInfo = $creditService->getCreditsInfo($subscription);
+                $smsCredits = [
+                    'remaining' => (int)$creditsInfo['total_available'],
+                    'monthly_quota' => (int)$creditsInfo['monthly_quota'],
+                    'monthly_used' => (int)$creditsInfo['monthly_used'],
+                    'addon_balance' => (int)$creditsInfo['addon_balance'],
+                    'expires_in_days' => $subscription->expires_at ? $subscription->expires_at->diffInDays($now) : null,
+                    'is_low' => $creditsInfo['total_available'] < 10,
+                    'is_critical' => $creditsInfo['total_available'] < 1,
+                ];
+                Log::info('SMS credits for company', ['company_id' => $company->id, 'credits' => $smsCredits]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('Could not fetch SMS credits for company', ['error' => $e->getMessage()]);
+        }
+
+        // ============= TENDANCES (cette semaine vs la dernière) =============
+        $thisWeekRequests = FeedbackRequest::where('company_id', $company->id)
+            ->whereBetween('created_at', [$lastWeek, $now])
+            ->count();
+        $lastWeekRequests = FeedbackRequest::where('company_id', $company->id)
+            ->whereBetween('created_at', [$lastWeek->copy()->subDays(7), $lastWeek])
+            ->count();
+        $requestsTrend = $lastWeekRequests > 0 ? round((($thisWeekRequests - $lastWeekRequests) / $lastWeekRequests) * 100, 1) : ($thisWeekRequests > 0 ? 100 : 0);
+
+        // Taux réponse
+        $thisWeekCompleted = FeedbackRequest::where('company_id', $company->id)
+            ->whereBetween('created_at', [$lastWeek, $now])
+            ->where('status', 'completed')
+            ->count();
+        $lastWeekCompleted = FeedbackRequest::where('company_id', $company->id)
+            ->whereBetween('created_at', [$lastWeek->copy()->subDays(7), $lastWeek])
+            ->where('status', 'completed')
+            ->count();
+        $thisWeekRate = $thisWeekRequests > 0 ? round(($thisWeekCompleted / $thisWeekRequests) * 100, 1) : 0;
+        $lastWeekRate = $lastWeekRequests > 0 ? round(($lastWeekCompleted / $lastWeekRequests) * 100, 1) : 0;
+        $rateTrend = $lastWeekRate > 0 ? round(($thisWeekRate - $lastWeekRate), 1) : ($thisWeekRate > 0 ? 100 : 0);
+
+        // Satisfaction
+        $thisWeekFeedbacks = $feedbacks->filter(fn($f) => $f->created_at->greaterThanOrEqualTo($lastWeek));
+        $lastWeekFeedbacks = FeedbackRequest::where('company_id', $company->id)
+            ->whereBetween('created_at', [$lastWeek->copy()->subDays(7), $lastWeek])
+            ->with('feedback')
+            ->get();
+
+        $thisWeekAvgRating = $thisWeekFeedbacks->whereNotNull('feedback.rating')->pluck('feedback.rating')->avg();
+        $thisWeekAvgRating = $thisWeekAvgRating ? round((float) $thisWeekAvgRating, 2) : null;
+        $lastWeekAvgRating = $lastWeekFeedbacks->whereNotNull('feedback.rating')->pluck('feedback.rating')->avg();
+        $lastWeekAvgRating = $lastWeekAvgRating ? round((float) $lastWeekAvgRating, 2) : null;
+        $ratingTrend = $thisWeekAvgRating !== null && $lastWeekAvgRating !== null 
+            ? round($thisWeekAvgRating - $lastWeekAvgRating, 2) 
+            : null;
+
+        // ============= GOALS & TARGETS =============
+        $goals = [
+            'response_rate' => [
+                'target' => 50,
+                'current' => $responseRate,
+                'progress' => min(100, round(($responseRate / 50) * 100, 1)),
+            ],
+            'avg_response_time' => [
+                'target' => 3,
+                'current' => $avgResponseHours,
+                'progress' => $avgResponseHours ? min(100, round((1 - min($avgResponseHours / 3, 1)) * 100, 1)) : 0,
+            ],
+            'satisfaction' => [
+                'target' => 4.5,
+                'current' => $avgRating,
+                'progress' => $avgRating ? min(100, round(($avgRating / 4.5) * 100, 1)) : 0,
+            ],
         ];
+
+        // ============= AUTRES STATS =============
+        $customers = Customer::where('company_id', $company->id)
+            ->withCount([
+                'feedbackRequests as total_feedbacks',
+                'feedbackRequests as completed_feedbacks' => function ($q) {
+                    $q->where('status', 'completed');
+                }
+            ])
+            ->latest()
+            ->get()
+            ->map(fn($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'email' => $c->email,
+                'phone' => $c->phone,
+                'total_feedbacks' => $c->total_feedbacks,
+                'completed_feedbacks' => $c->completed_feedbacks,
+            ]);
+
+        $ratings = collect([1, 2, 3, 4, 5])->mapWithKeys(function ($star) use ($feedbacks) {
+            return [$star => $feedbacks->filter(fn($f) => $f->feedback?->rating == $star)->count()];
+        });
 
         $feedbackTrendRaw = Feedback::query()
             ->whereHas('feedbackRequest', function ($q) use ($company) {
@@ -142,11 +231,46 @@ class DashboardController extends Controller
             ]);
         }
 
+        $stats = [
+            'customers' => $customers->count(),
+            'feedbacks_total' => $feedbacks->count(),
+            'feedbacks_completed' => $completedTotal,
+            'feedbacks_sent' => $sentTotal,
+            'feedbacks_failed' => $failedTotal,
+            'requests_total' => $requestsTotal,
+            'requests_last_7d' => $requestsLast7,
+            'completed_last_7d' => $completedLast7,
+            'response_rate' => $responseRate,
+            'response_rate_7d' => $responseRate7d,
+            'avg_rating' => $avgRating,
+            'avg_response_hours' => $avgResponseHours,
+            'nps' => $nps,
+            'positive_count' => $positiveCount,
+            'negative_count' => $negativeCount,
+            'neutral_count' => $neutralCount,
+            'ratings' => $ratings,
+            'channel_email' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'email')->count(),
+            'channel_sms' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'sms')->count(),
+            'channel_whatsapp' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'whatsapp')->count(),
+            'channel_qr' => FeedbackRequest::where('company_id', $company->id)->where('channel', 'qr')->count(),
+        ];
+
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'customers' => $customers,
-            'recentFeedbacks' => $feedbacks,
+            'recentFeedbacks' => $feedbacks->take(10),
             'feedbackTrend' => $feedbackTrend,
+            'alerts' => [
+                'critical_feedbacks' => $criticalFeedbacks,
+                'overdue_feedbacks' => $overdueFeedbacks,
+                'sms_credits' => $smsCredits,
+            ],
+            'trends' => [
+                'requests' => $requestsTrend,
+                'response_rate' => $rateTrend,
+                'satisfaction' => $ratingTrend,
+            ],
+            'goals' => $goals,
         ]);
     }
 
@@ -168,6 +292,25 @@ class DashboardController extends Controller
             $analysis['cacheInfo'] = "Analyse mise en cache depuis " . $analysis['cached_at'];
         }
 
+        // Charger les radar issues actives pour le frontend
+        $radarIssues = RadarIssue::where('company_id', $company->id)
+            ->with(['task', 'feedbacks:id,rating,comment'])
+            ->latest('detected_at')
+            ->get()
+            ->map(fn ($issue) => [
+                'id' => $issue->id,
+                'title' => $issue->title,
+                'description' => $issue->description,
+                'category' => $issue->category,
+                'severity' => $issue->severity,
+                'status' => $issue->status,
+                'task_id' => $issue->task_id,
+                'task_status' => $issue->task?->status,
+                'feedback_count' => $issue->feedbacks->count(),
+                'detected_at' => $issue->detected_at?->format('d/m/Y'),
+                'resolved_at' => $issue->resolved_at?->format('d/m/Y'),
+            ]);
+
         return Inertia::render('Dashboard/RadarIA', [
             'period' => $data['period'],
             'stats' => $data['stats'],
@@ -179,6 +322,7 @@ class DashboardController extends Controller
             'healthScore' => $data['healthScore'],
             'analysis' => $analysis,
             'lastUpdated' => $lastUpdated,
+            'radarIssues' => $radarIssues,
         ]);
     }
 
@@ -485,6 +629,35 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function exportRadarPdf(Request $request)
+    {
+        $company = Auth::user()->company;
+
+        if (! $company) {
+            abort(403);
+        }
+
+        $days = (int) $request->query('days', 30);
+        $days = max(7, min($days, 90));
+
+        $data = $this->buildRadarData($company, $days);
+
+        $filename = 'radar-ia-pro-' . $company->id . '-' . now()->format('Ymd_His') . '.pdf';
+
+        // Générer le contenu HTML pour le PDF
+        $html = view('pdf.radar-report', [
+            'company' => $company,
+            'data' => $data,
+            'generated_at' => now()->format('d/m/Y H:i'),
+        ])->render();
+
+        // Utiliser DomPDF pour générer le PDF
+        $pdf = Pdf::loadHTML($html);
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->download($filename);
+    }
+
     private function buildRadarData($company, int $days): array
     {
         $periodStart = now()->subDays($days)->startOfDay();
@@ -506,11 +679,21 @@ class DashboardController extends Controller
             ->whereBetween('created_at', [$prevPeriodStart, $prevPeriodEnd])
             ->get();
 
+        // Catégories de radar issues actives (tâche créée mais pas encore résolue)
+        // → On filtre par catégorie APRÈS détection, pas par feedback_id
+        $activeRadarCategories = RadarIssue::where('company_id', $company->id)
+            ->where('status', RadarIssue::STATUS_TASK_CREATED)
+            ->whereNotNull('category')
+            ->pluck('category')
+            ->unique()
+            ->all();
+
         $analysisFeedbacks = Feedback::query()
             ->whereHas('feedbackRequest', function ($q) use ($company) {
                 $q->where('company_id', $company->id);
             })
             ->whereNotNull('comment')
+            ->whereNull('resolved_at')  // Exclure les feedbacks résolus
             ->with(['feedbackRequest.customer'])
             ->whereBetween('created_at', [$periodStart, $periodEnd])
             ->latest()
@@ -608,16 +791,17 @@ class DashboardController extends Controller
                 'evidence_count' => $negative,
                 'evidence' => $negativeEvidence,
             ];
-            $recommendedActions[] = [
-                'priority' => 'P0',
-                'title' => 'Traiter les causes principales des avis négatifs',
-                'detail' => 'Identifier les 3 problèmes récurrents et définir un plan d’action correctif sur 7 jours.',
-                'context' => [
-                    'signal_title' => 'Hausse du taux négatif',
-                    'signal_detail' => "Taux négatif en hausse de {$negativeDelta} points vs période précédente.",
-                    'evidence' => $negativeEvidence,
-                ],
-            ];
+            
+            // Analyser les problèmes spécifiques dans les feedbacks négatifs
+            $specificIssues = $this->extractSpecificIssues($analysisFeedbacks);
+            // Filtrer: ne pas afficher les catégories qui ont déjà une tâche active
+            foreach ($specificIssues as $issue) {
+                $issueCategory = $issue['context']['category'] ?? null;
+                if ($issueCategory && in_array($issueCategory, $activeRadarCategories)) {
+                    continue; // Cette catégorie a déjà une tâche en cours
+                }
+                $recommendedActions[] = $issue;
+            }
         }
 
         $responseDelta = round($responseRate - $prevResponseRate, 1);
@@ -964,4 +1148,116 @@ class DashboardController extends Controller
 
         return round($sorted[$mid], 1);
     }
+
+    /**
+     * Extraire les problèmes spécifiques et concrets des feedbacks négatifs
+     * pour créer des actions actionnables (ex: "Améliorer comportement serveur" au lieu de généralités)
+     * 
+     * @param \Illuminate\Support\Collection $feedbacks
+     * @return array
+     */
+    private function extractSpecificIssues($feedbacks): array
+    {
+        $negativeFeedbacks = $feedbacks->filter(fn($f) => $f->rating !== null && $f->rating <= 2);
+        
+        if ($negativeFeedbacks->isEmpty()) {
+            return [];
+        }
+
+        // Mots-clés pour détecter les problèmes courants dans un restaurant
+        $issuePatterns = [
+            'service' => [
+                'keywords' => ['serveur', 'serveuse', 'service', 'personnel', 'accueil', 'attente', 'lent', 'long', 'oublié', 'impoli', 'désagréable', 'comportement', 'attitude', 'professionnel', 'negligent'],
+                'title' => 'Améliorer la qualité du service',
+                'detail' => 'Former l\'équipe sur l\'accueil client, réduire les temps d\'attente et améliorer la gestion des commandes.',
+                'priority' => 'P0',
+            ],
+            'qualite' => [
+                'keywords' => ['plat', 'nourriture', 'cuisine', 'froid', 'chaud', 'fade', 'brûlé', 'cru', 'qualité', 'mauvais', 'immangeable', 'portion', 'goût', 'saveur', 'cuit', 'cru', 'insuffisant'],
+                'title' => 'Améliorer la qualité de la nourriture',
+                'detail' => 'Renforcer le contrôle qualité en cuisine, vérifier les températures de service et standardiser les portions.',
+                'priority' => 'P0',
+            ],
+            'proprete' => [
+                'keywords' => ['propre', 'propreté', 'sale', 'saleté', 'hygiène', 'toilettes', 'table', 'vaisselle', 'déchet', 'poussière', 'tache', 'malpropre'],
+                'title' => 'Renforcer l\'hygiène et la propreté',
+                'detail' => 'Mettre en place un planning de nettoyage renforcé et vérifier l\'état des sanitaires toutes les heures.',
+                'priority' => 'P0',
+            ],
+            'prix' => [
+                'keywords' => ['cher', 'prix', 'tarif', 'coût', 'facture', 'addition', 'rapport', 'valeur', 'abusif', 'excessif', 'surcharge', 'overpriced'],
+                'title' => 'Revoir la stratégie tarifaire',
+                'detail' => 'Analyser le rapport qualité/prix perçu et considérer des formules ou menus adaptés.',
+                'priority' => 'P1',
+            ],
+            'ambiance' => [
+                'keywords' => ['bruit', 'bruyant', 'musique', 'ambiance', 'décor', 'lumière', 'climatisation', 'chaleur', 'froid', 'atmosphère', 'confortable', 'agréable'],
+                'title' => 'Améliorer l\'ambiance du restaurant',
+                'detail' => 'Ajuster le volume sonore, la température et l\'éclairage pour créer une atmosphère agréable.',
+                'priority' => 'P2',
+            ],
+            'menu' => [
+                'keywords' => ['carte', 'menu', 'choix', 'option', 'végétarien', 'vegan', 'allergie', 'sans gluten', 'diversité', 'limité', 'monotone'],
+                'title' => 'Diversifier l\'offre du menu',
+                'detail' => 'Ajouter des options pour régimes spéciaux (végétarien, vegan, sans gluten) et élargir la carte.',
+                'priority' => 'P1',
+            ],
+        ];
+
+        $detectedIssues = [];
+        $allComments = mb_strtolower($negativeFeedbacks->pluck('comment')->filter()->implode(' '));
+
+        foreach ($issuePatterns as $category => $pattern) {
+            $matchCount = 0;
+            $evidence = [];
+            
+            foreach ($pattern['keywords'] as $keyword) {
+                if (mb_strpos($allComments, $keyword) !== false) {
+                    $matchCount++;
+                }
+            }
+
+            // Si au moins 1 mot-clé détecté, c'est un problème potentiel (pour P0/service: P1/autres)
+            $minMatches = ($category === 'service' || $category === 'qualite' || $category === 'proprete') ? 1 : 2;
+            
+            if ($matchCount >= $minMatches) {
+                // Récupérer les feedbacks contenant ces mots-clés
+                $relevantFeedbacks = $negativeFeedbacks->filter(function($f) use ($pattern) {
+                    $comment = strtolower($f->comment ?? '');
+                    foreach ($pattern['keywords'] as $keyword) {
+                        if (mb_strpos($comment, $keyword) !== false) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })->take(3);
+
+                $evidence = $relevantFeedbacks->map(fn($f) => str($f->comment)->limit(120)->toString())->values()->all();
+                $feedbackIds = $relevantFeedbacks->pluck('id')->values()->all();
+
+                $detectedIssues[] = [
+                    'priority' => $pattern['priority'],
+                    'title' => $pattern['title'],
+                    'detail' => $pattern['detail'] . " ({$matchCount} mentions détectées)",
+                    'context' => [
+                        'category' => $category,
+                        'mentions' => $matchCount,
+                        'evidence' => $evidence,
+                        'feedback_ids' => $feedbackIds,
+                    ],
+                ];
+            }
+        }
+
+        // Trier par priorité P0 > P1 > P2
+        usort($detectedIssues, function($a, $b) {
+            $priorities = ['P0' => 0, 'P1' => 1, 'P2' => 2];
+            return ($priorities[$a['priority']] ?? 99) <=> ($priorities[$b['priority']] ?? 99);
+        });
+
+        // Retourner les actions détectées (pas de fallback générique)
+        // Si aucun problème n'est détecté, on retourne un array vide
+        return array_slice($detectedIssues, 0, 4);
+    }
 }
+

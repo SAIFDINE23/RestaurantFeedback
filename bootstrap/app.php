@@ -17,18 +17,16 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        $middleware->web(append: [
-        HandleInertiaRequests::class,
-    ]);
-
         $middleware->validateCsrfTokens(except: [
             'stripe/webhook',
+            'webhooks/stripe',
         ]);
 
         $middleware->alias([
             'plan.feature' => \App\Http\Middleware\CheckPlanFeature::class,
             'plan.credits' => \App\Http\Middleware\CheckCredits::class,
             'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
+            'throttle.stripe' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

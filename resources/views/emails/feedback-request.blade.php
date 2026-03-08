@@ -1,23 +1,154 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demande de feedback</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center; color: white; }
-        .header img { max-height: 50px; margin-bottom: 15px; }
-        .content { padding: 40px 30px; }
-        .content h2 { color: #333; margin-bottom: 20px; }
-        .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 15px 40px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .footer { background: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e0e0e0; }
-        .company-name { font-weight: 600; color: #667eea; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px;
+            background: #fafafa;
+        }
+        .content p {
+            margin: 0 0 15px 0;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .company-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        .company-logo {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .company-logo img {
+            max-height: 80px;
+            max-width: 100%;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white !important;
+            padding: 14px 40px;
+            text-decoration: none !important;
+            border-radius: 25px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.2s;
+            text-align: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .cta-button:hover {
+            transform: scale(1.02);
+            text-decoration: none !important;
+        }
+        .footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            background: #f5f5f5;
+            border-top: 1px solid #eee;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .rating-preview {
+            text-align: center;
+            font-size: 28px;
+            margin: 15px 0;
+            letter-spacing: 10px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="email-container">
+        <div class="header">
+            @if($companyLogo)
+                <div style="margin-bottom: 15px;">
+                    <img src="{{ $companyLogo }}" alt="{{ $companyName }}" style="max-height: 60px;">
+                </div>
+            @endif
+            <h1>📝 {{ $companyName }}</h1>
+            <p>Donnez votre avis en 30 secondes</p>
+        </div>
+        
+        <div class="content">
+            <p>Bonjour <strong>{{ $customerName }}</strong>,</p>
+            
+            <p>Merci de votre confiance ! Nous aimerions connaître votre avis sur votre expérience récente avec <strong>{{ $companyName }}</strong>.</p>
+            
+            <p>Vos commentaires nous aident à améliorer nos services et à mieux vous servir.</p>
+
+            <div class="company-info">
+                <p style="margin-top: 0; text-align: center;">
+                    <strong>Évaluez votre expérience</strong>
+                </p>
+                <div class="rating-preview">⭐ ⭐ ⭐ ⭐ ⭐</div>
+                <p style="text-align: center; color: #666; font-size: 13px;">
+                    Notez de 1 à 5 étoiles et laissez vos commentaires
+                </p>
+            </div>
+
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="{{ $feedbackLink }}" class="cta-button">Donner mon avis maintenant</a>
+            </p>
+            
+            <p style="font-size: 13px; color: #999; text-align: center;">
+                ou copiez ce lien : <br>
+                <code style="background: #f5f5f5; padding: 5px 10px; border-radius: 4px; font-size: 11px; word-break: break-all;">{{ $feedbackLink }}</code>
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+
+            <p style="font-size: 13px; color: #666;">
+                Cordialement,<br>
+                <strong>L'équipe {{ $companyName }}</strong>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; {{ date('Y') }} {{ $companyName }}. Tous droits réservés.</p>
+            <p style="margin-top: 10px;">Cet email vous a été envoyé car vous êtes un client de {{ $companyName }}.</p>
+        </div>
+    </div>
+</body>
+</html>
         <div class="header">
             <img src="{{ asset('images/logo_Luminea.png') }}" alt="Luminea">
             <h1 style="margin: 0; font-size: 24px;">Demande de Feedback</h1>

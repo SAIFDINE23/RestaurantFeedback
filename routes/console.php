@@ -2,8 +2,30 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 use App\Services\GlobalRadarBuilder;
 use App\Services\RadarAnalysisService;
+
+/*
+|--------------------------------------------------------------------------
+| Scheduled Tasks
+|--------------------------------------------------------------------------
+*/
+
+// Reset mensuel des crédits (chaque 1er du mois à 00:05)
+Schedule::command('credits:reset-monthly')->monthlyOn(1, '00:05');
+
+// Downgrade des subscriptions past_due > 14 jours (tous les jours à 02:00)
+Schedule::command('subscriptions:expire-overdue')->dailyAt('02:00');
+
+// Cleanup des vieux événements Stripe > 90 jours (chaque dimanche à 03:00)
+Schedule::command('stripe:cleanup-events --days=90')->weeklyOn(0, '03:00');
+
+/*
+|--------------------------------------------------------------------------
+| Artisan Commands
+|--------------------------------------------------------------------------
+*/
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

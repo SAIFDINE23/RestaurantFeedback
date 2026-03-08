@@ -18,7 +18,7 @@ use App\Http\Controllers\{
     PricingController,
     SubscriptionController,
     StripeController,
-    StripeWebhookController
+    PublicFormController
 };
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminRadarController;
@@ -53,7 +53,7 @@ Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
 |--------------------------------------------------------------------------
 */
 
-Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])
+Route::post('/webhooks/stripe', [StripeController::class, 'webhook'])
     ->name('webhooks.stripe');
 
 /*
@@ -67,6 +67,18 @@ Route::get('/feedback/{token}', [FeedbackController::class, 'show'])
 
 Route::post('/feedback/{token}', [FeedbackController::class, 'store'])
     ->name('feedback.store');
+
+/*
+|--------------------------------------------------------------------------
+| Formulaire public de collecte de contacts (QR Code)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/join/{token}', [PublicFormController::class, 'show'])
+    ->name('public.form.show');
+
+Route::post('/join/{token}', [PublicFormController::class, 'store'])
+    ->name('public.form.store');
 
 /*
 |--------------------------------------------------------------------------
@@ -98,6 +110,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/feedback/{id}/replies', [FeedbackReplyController::class, 'store'])
         ->name('feedback.replies.store');
 
+    // Marquer un feedback comme résolu
+    Route::post('/feedback/{id}/resolve', [FeedbackController::class, 'resolve'])
+        ->name('feedback.resolve');
+
+    // Marquer un feedback comme non résolu
+    Route::post('/feedback/{id}/unresolve', [FeedbackController::class, 'unresolve'])
+        ->name('feedback.unresolve');
+
+    // Épingler un feedback
+    Route::post('/feedback/{id}/pin', [FeedbackController::class, 'pin'])
+        ->name('feedback.pin');
+
+    // Dépingler un feedback
+    Route::post('/feedback/{id}/unpin', [FeedbackController::class, 'unpin'])
+        ->name('feedback.unpin');
+
+    // Supprimer un feedback
+    Route::delete('/feedback/{id}', [FeedbackController::class, 'destroy'])
+        ->name('feedback.destroy');
+
+    // Envoyer un reminder pour une demande de feedback
+    Route::post('/feedback-request/{id}/remind', [FeedbackRequestController::class, 'sendReminder'])
+        ->name('feedback-request.remind');
+
+    // Envoyer des reminders en masse
+    Route::post('/feedback-requests/remind-all', [FeedbackRequestController::class, 'sendAllReminders'])
+        ->name('feedback-requests.remind-all');
+
     // Génération IA d'une réponse
     Route::post('/feedback/{id}/replies/ai', [FeedbackReplyController::class, 'generateAIReply'])
         ->middleware('plan.feature:ai_reply_generation')
@@ -120,6 +160,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/radar-ia/export', [DashboardController::class, 'exportRadar'])
         ->middleware('plan.feature:radar_ai')
         ->name('radar.export');
+    Route::get('/radar-ia/export-pdf', [DashboardController::class, 'exportRadarPdf'])
+        ->middleware('plan.feature:radar_ai')
+        ->name('radar.export.pdf');
 
     /*
     | Subscription & Crédits
@@ -137,12 +180,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('subscription.confirmUpgrade');
 
     /*
-    | Stripe Checkout
+    | Stripe Checkout (rate limited: 5 per minute)
     */
-    Route::post('/stripe/checkout/plan/{planId}', [StripeController::class, 'checkoutPlan'])
-        ->name('stripe.checkout.plan');
-    Route::post('/stripe/checkout/addon/{addonId}', [StripeController::class, 'checkoutAddon'])
-        ->name('stripe.checkout.addon');
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('/stripe/checkout/plan/{planId}', [StripeController::class, 'checkoutPlan'])
+            ->name('stripe.checkout.plan');
+        Route::post('/stripe/checkout/addon/{addonId}', [StripeController::class, 'checkoutAddon'])
+            ->name('stripe.checkout.addon');
+    });
 
     Route::get('/stripe/success', [StripeController::class, 'success'])
         ->name('stripe.success');
@@ -166,6 +211,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('analytics');
 
     /*
+    | Contacts / Customers (company)
+    */
+    Route::get('/contacts', [CustomerController::class, 'index'])
+        ->name('contacts.index');
+    Route::post('/contacts', [CustomerController::class, 'store'])
+        ->name('contacts.store');
+    Route::delete('/contacts/{customer}', [CustomerController::class, 'destroy'])
+        ->name('contacts.destroy');
+    Route::post('/contacts/import', [CustomerController::class, 'import'])
+        ->name('contacts.import');
+    Route::post('/contacts/send-feedback-request', [CustomerController::class, 'sendFeedbackRequest'])
+        ->name('contacts.send-feedback-request');
+
+    /*
     | Profile
     */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -173,16 +232,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     /*
-    | Customers
+    | Customers (redirect vers contacts + sous-routes détail)
     */
-    Route::get('/customers', [CustomerController::class, 'index'])
-        ->name('customers.index');
-
-    Route::get('/customers/create', [CustomerController::class, 'create'])
-        ->name('customers.create');
-
-    Route::post('/customers', [CustomerController::class, 'store'])
-        ->name('customers.store');
+    Route::get('/customers', function () {
+        return redirect()->route('contacts.index');
+    })->name('customers.index');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])
         ->name('customers.show');
     Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])
@@ -191,12 +245,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('customers.qr');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])
         ->name('customers.update');
-    Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])
-    ->name('customers.destroy');
-
-
-    Route::post('/customers/import-csv', [CustomerController::class, 'importCSV'])
-        ->name('customers.importCSV');
 
     Route::get('/company/settings', [CompanyController::class, 'edit'])
         ->name('company.edit');
@@ -219,9 +267,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/account-settings', [CompanyController::class, 'update'])
         ->name('settings.update');
 
+    Route::delete('/account-settings', [CompanyController::class, 'destroyAccount'])
+        ->name('settings.delete-account');
+
     /*
     | Feedback requests (send / resend)
     */
+    Route::get('/feedback-requests/studio', [FeedbackRequestController::class, 'studio'])
+        ->name('feedback-requests.studio');
+
+    Route::put('/feedback-requests/templates', [FeedbackRequestController::class, 'updateTemplates'])
+        ->name('feedback-requests.templates.update');
+
     Route::post('/feedback-requests', [FeedbackRequestController::class, 'store'])
         ->middleware(['plan.credits:1', 'plan.limits:feedbacks'])
         ->name('feedback-requests.store');
@@ -231,9 +288,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('feedback-requests.bulk');
 });
 
-// Stripe Webhook (public)
-Route::post('/stripe/webhook', [StripeController::class, 'webhook'])
-    ->name('stripe.webhook');
+// Note: Stripe webhook is handled at /webhooks/stripe (see public routes above)
 
 /*
 ||--------------------------------------------------------------------------
@@ -271,7 +326,16 @@ Route::middleware(['auth', 'verified', IsAdmin::class])->prefix('admin')->name('
         ->name('settings');
 });
 
-
-
+/*
+|--------------------------------------------------------------------------
+| Test routes - Brevo Email & SMS
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'verified'])->prefix('test-brevo')->name('test-brevo.')->group(function () {
+    Route::post('/email', [\App\Http\Controllers\TestBrevoController::class, 'testEmail'])->name('email');
+    Route::post('/sms', [\App\Http\Controllers\TestBrevoController::class, 'testSMS'])->name('sms');
+    Route::get('/config', [\App\Http\Controllers\TestBrevoController::class, 'checkConfiguration'])->name('config');
+    Route::get('/sms-credits', [\App\Http\Controllers\TestSmsCreditsController::class, 'checkSmsCredits'])->name('sms-credits');
+});
 
 require __DIR__.'/auth.php';

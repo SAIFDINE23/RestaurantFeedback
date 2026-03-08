@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Task;
+use App\Models\RadarIssue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -67,15 +68,35 @@ class TaskController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
             'status' => ['nullable', 'in:not_started,in_progress,completed'],
             'importance' => ['nullable', 'in:high,medium,low'],
+            'feedback_ids' => ['nullable', 'array'],
+            'feedback_ids.*' => ['integer', 'exists:feedback,id'],
+            'radar_category' => ['nullable', 'string', 'max:50'],
         ]);
 
-        Task::create([
+        $task = Task::create([
             'company_id' => $company->id,
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
             'status' => $validated['status'] ?? Task::STATUS_NOT_STARTED,
             'severity' => $this->importanceToSeverity($validated['importance'] ?? 'medium'),
+            'source' => !empty($validated['feedback_ids']) ? 'radar_ia' : null,
         ]);
+
+        // Si des feedback_ids sont fournis, créer un RadarIssue et lier les feedbacks
+        if (!empty($validated['feedback_ids'])) {
+            $radarIssue = RadarIssue::create([
+                'company_id' => $company->id,
+                'task_id' => $task->id,
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'category' => $validated['radar_category'] ?? null,
+                'severity' => $this->importanceToSeverityLabel($validated['importance'] ?? 'medium'),
+                'status' => RadarIssue::STATUS_TASK_CREATED,
+                'detected_at' => now(),
+            ]);
+
+            $radarIssue->feedbacks()->attach($validated['feedback_ids']);
+        }
 
         return back();
     }
@@ -96,12 +117,38 @@ class TaskController extends Controller
             'status' => $validated['status'],
         ]);
 
+        // Auto-résoudre le radar issue si la tâche est complétée
+        if ($validated['status'] === Task::STATUS_COMPLETED && $task->radarIssue) {
+            $task->radarIssue->update([
+                'status' => RadarIssue::STATUS_RESOLVED,
+                'resolved_at' => now(),
+            ]);
+        }
+
+        // Si la tâche est réouverte, réouvrir aussi le radar issue
+        if ($validated['status'] !== Task::STATUS_COMPLETED && $task->radarIssue?->status === RadarIssue::STATUS_RESOLVED) {
+            $task->radarIssue->update([
+                'status' => RadarIssue::STATUS_TASK_CREATED,
+                'resolved_at' => null,
+            ]);
+        }
+
         return back();
     }
 
     private function importanceToSeverity(string $importance): string
     {
         return self::IMPORTANCE_MAP[$importance] ?? Task::SEVERITY_MODERATE;
+    }
+
+    private function importanceToSeverityLabel(string $importance): string
+    {
+        return match ($importance) {
+            'high' => 'P0',
+            'medium' => 'P1',
+            'low' => 'P2',
+            default => 'P1',
+        };
     }
 
     private function severityToImportance(?string $severity): string

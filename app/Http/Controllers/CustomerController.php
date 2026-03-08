@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\FeedbackRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -13,47 +14,79 @@ use Inertia\Inertia;
 class CustomerController extends Controller
 {
     /**
-     * Liste des clients de la company.
+     * Liste des clients/contacts de la company.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $company = Auth::user()->company;
+        $company = $request->user()->company;
 
-        $customers = $company->customers()
+        $query = Customer::where('company_id', $company->id)
             ->with(['feedbackRequests' => fn ($q) => $q->latest()])
-            ->get();
+            ->orderBy('created_at', 'desc');
 
-        return Inertia::render('Customers/Index', [
-            'customers' => $customers,
+        // Filtrer par source
+        if ($request->has('source') && $request->source !== 'all') {
+            $query->where('source', $request->source);
+        }
+
+        // Recherche
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('email', 'ILIKE', "%{$search}%")
+                    ->orWhere('phone', 'ILIKE', "%{$search}%");
+            });
+        }
+
+        $contacts = $query->paginate(20)->withQueryString();
+
+        // Stats
+        $stats = [
+            'total' => Customer::where('company_id', $company->id)->count(),
+            'qr_code' => Customer::where('company_id', $company->id)->where('source', 'qr_code')->count(),
+            'manual' => Customer::where('company_id', $company->id)->where('source', 'manual')->count(),
+            'import' => Customer::where('company_id', $company->id)->where('source', 'import')->count(),
+            'recent' => Customer::where('company_id', $company->id)->recent(7)->count(),
+        ];
+
+        // QR Code URL
+        $qrCodeUrl = $company->getPublicFormUrl();
+
+        return Inertia::render('Contacts/Index', [
+            'contacts' => $contacts,
+            'stats' => $stats,
+            'filters' => [
+                'source' => $request->source ?? 'all',
+                'search' => $request->search ?? '',
+            ],
+            'qrCodeUrl' => $qrCodeUrl,
         ]);
     }
 
     /**
-     * Formulaire d'ajout manuel.
-     */
-    public function create()
-    {
-        return Inertia::render('Customers/Create');
-    }
-
-    /**
-     * Ajouter un customer manuel.
+     * Ajouter un client manuellement.
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'name' => 'nullable|string|max:255',
+        $company = $request->user()->company;
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
             'phone' => 'nullable|string|max:20',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
-        $company = Auth::user()->company;
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
 
         // Vérifier si le client existe déjà
         if (Customer::where('email', $request->email)
             ->where('company_id', $company->id)
             ->exists()) {
-            return back()->withErrors(['email' => 'Ce client existe déjà.']);
+            return back()->withErrors(['email' => 'Ce client existe déjà dans votre liste.']);
         }
 
         Customer::create([
@@ -61,6 +94,8 @@ class CustomerController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,
+            'source' => 'manual',
+            'notes' => $request->notes,
         ]);
 
         return back()->with('success', 'Client ajouté avec succès.');
@@ -124,7 +159,7 @@ class CustomerController extends Controller
             'phone' => $request->phone,
         ]);
 
-        return redirect()->route('customers.show', $customer)->with('success', 'Client mis à jour avec succès.');
+        return redirect()->route('customers.index')->with('success', 'Client mis à jour avec succès.');
     }
 
     /**
@@ -165,71 +200,124 @@ class CustomerController extends Controller
         ]);
     }
 
+    /**
+     * Supprimer un client.
+     */
     public function destroy(Request $request, Customer $customer)
     {
-        // 🔐 Sécurité : vérifier que le client appartient bien à l'utilisateur connecté
         if ($customer->company_id !== $request->user()->company->id) {
             abort(403);
         }
 
-        // 🧹 Suppression propre (feedbacks liés)
         $customer->feedbackRequests()->delete();
-
-        // ❌ Suppression du client
         $customer->delete();
 
-        return back()->with('success', 'Client supprimé avec succès');
+        return back()->with('success', 'Client supprimé avec succès.');
     }
 
     /**
-     * Upload CSV pour créer plusieurs clients.
+     * Import CSV de clients.
      */
-    public function importCSV(Request $request)
+    public function import(Request $request)
     {
-        $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt',
+        $company = $request->user()->company;
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:csv,txt|max:2048',
         ]);
 
-        $company = Auth::user()->company;
-        $file = fopen($request->file('csv_file')->getRealPath(), 'r');
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
 
-        $header = fgetcsv($file); // name,email,phone
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        $csv = array_map('str_getcsv', file($path));
 
-        $added = 0;
+        // Supprimer l'en-tête
+        $header = array_shift($csv);
+
+        $imported = 0;
         $skipped = 0;
 
-        while (($row = fgetcsv($file)) !== false) {
-            if (count($row) !== count($header)) {
+        foreach ($csv as $index => $row) {
+            if (count($row) < 2) {
                 $skipped++;
                 continue;
             }
 
-            $data = array_combine($header, $row);
+            $name = trim($row[0] ?? '');
+            $email = trim($row[1] ?? '');
+            $phone = trim($row[2] ?? '');
 
-            if (!isset($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            if (empty($name) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $skipped++;
                 continue;
             }
 
-            if (Customer::where('email', $data['email'])
-                ->where('company_id', $company->id)
-                ->exists()) {
+            if (Customer::where('company_id', $company->id)->where('email', $email)->exists()) {
                 $skipped++;
                 continue;
             }
 
             Customer::create([
                 'company_id' => $company->id,
-                'name' => $data['name'] ?? null,
-                'email' => $data['email'],
-                'phone' => $data['phone'] ?? null,
+                'name' => $name,
+                'email' => $email,
+                'phone' => $phone ?: null,
+                'source' => 'import',
             ]);
 
-            $added++;
+            $imported++;
         }
 
-        fclose($file);
+        $message = "{$imported} client(s) importé(s) avec succès.";
+        if ($skipped > 0) {
+            $message .= " {$skipped} ignoré(s) (doublons ou invalides).";
+        }
 
-        return back()->with('success', "$added clients ajoutés, $skipped ignorés.");
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Envoie une demande de feedback à un ou plusieurs clients.
+     */
+    public function sendFeedbackRequest(Request $request)
+    {
+        $company = $request->user()->company;
+
+        $validator = Validator::make($request->all(), [
+            'contact_ids' => 'required|array|min:1',
+            'contact_ids.*' => 'exists:customers,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        $customers = Customer::whereIn('id', $request->contact_ids)
+            ->where('company_id', $company->id)
+            ->get();
+
+        if ($customers->isEmpty()) {
+            return back()->withErrors(['contacts' => 'Aucun client sélectionné.']);
+        }
+
+        $sent = 0;
+
+        foreach ($customers as $customer) {
+            FeedbackRequest::create([
+                'company_id' => $company->id,
+                'customer_name' => $customer->name,
+                'customer_email' => $customer->email,
+                'customer_phone' => $customer->phone,
+                'sent_at' => now(),
+                'channel' => 'email',
+            ]);
+
+            $sent++;
+        }
+
+        return back()->with('success', "{$sent} demande(s) de feedback envoyée(s) avec succès.");
     }
 }

@@ -120,21 +120,29 @@ class StripeWebhookController extends Controller
         }
 
         // Mettre à jour le statut et la date d'expiration
-        $ends_at = \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_end);
-        
-        $subscription->update([
+        // Stripe API récente : current_period_end est dans items.data[0]
+        $periodEnd = $stripeSubscription->items->data[0]->current_period_end
+            ?? $stripeSubscription->current_period_end
+            ?? null;
+
+        $updateData = [
             'status' => $stripeSubscription->status,
-            'ends_at' => $ends_at,
             'trial_ends_at' => $stripeSubscription->trial_end 
                 ? \Carbon\Carbon::createFromTimestamp($stripeSubscription->trial_end)
                 : null,
-        ]);
+        ];
+
+        if ($periodEnd && (int) $periodEnd > time()) {
+            $updateData['ends_at'] = \Carbon\Carbon::createFromTimestamp((int) $periodEnd);
+        }
+
+        $subscription->update($updateData);
 
         Log::info('Subscription updated', [
             'subscription_id' => $subscription->id,
             'company_id' => $subscription->company_id,
             'new_status' => $stripeSubscription->status,
-            'new_ends_at' => $ends_at,
+            'new_ends_at' => $updateData['ends_at'] ?? null,
         ]);
     }
 

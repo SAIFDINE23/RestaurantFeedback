@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-import { Settings as SettingsIcon, Building2, Briefcase, MapPin, Bell, Lock, Users, LogOut, Save, Loader2, CheckCircle2, HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Briefcase, MapPin, Lock, Save, Loader2, CheckCircle2, HelpCircle, Eye, EyeOff, Trash2, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Settings({ auth, company }) {
@@ -38,11 +38,27 @@ export default function Settings({ auth, company }) {
         });
     };
 
+    const { data: deleteData, setData: setDeleteData, delete: deleteAccount, processing: deleteProcessing } = useForm({
+        confirmation: ''
+    });
+
+    const submitDelete = (e) => {
+        e.preventDefault();
+        if (confirm('⚠️ Êtes-vous absolument sûr ? Cette action est IRRÉVERSIBLE et supprimera :\n\n• Votre compte\n• Tous vos données\n• Tous vos feedbacks\n\nTapez "SUPPRIMER" pour confirmer.')) {
+            const confirmation = prompt('Confirmer en tapant: SUPPRIMER');
+            if (confirmation === 'SUPPRIMER') {
+                deleteAccount(route('settings.delete-account'), {
+                    onSuccess: () => {
+                        window.location.href = '/';
+                    }
+                });
+            }
+        }
+    };
+
     const tabs = [
         { id: 'profile', label: 'Profil Entreprise', icon: Building2 },
         { id: 'security', label: 'Sécurité', icon: Lock },
-        { id: 'notifications', label: 'Notifications', icon: Bell, comingSoon: true },
-        { id: 'team', label: 'Équipe', icon: Users, comingSoon: true },
     ];
 
     return (
@@ -416,23 +432,70 @@ export default function Settings({ auth, company }) {
                     </div>
                 )}
 
-                {/* Coming Soon Tabs */}
-                {(activeTab === 'notifications' || activeTab === 'team') && (
-                    <div className="bg-white rounded-2xl shadow-2xl border-2 border-amber-200 overflow-hidden">
-                        <div className="p-12 text-center">
-                            <div className="w-20 h-20 bg-gradient-to-br from-amber-100 to-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <span className="text-4xl">🚀</span>
+                {/* Delete Account Section */}
+                {activeTab === 'security' && (
+                    <div className="space-y-8">
+                        {/* Existing password change form above this is already shown */}
+                        
+                        {/* Delete Account - Danger Zone */}
+                        <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-2xl shadow-lg border-2 border-red-300 overflow-hidden">
+                            <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 flex items-center gap-4">
+                                <Trash2 className="w-8 h-8 text-white" />
+                                <div>
+                                    <h3 className="text-xl font-black text-white">Zone dangereuse</h3>
+                                    <p className="text-red-100 text-sm">Supprimer votre compte définitivement</p>
+                                </div>
                             </div>
-                            <h3 className="text-2xl font-black text-gray-900 mb-3">Bientôt disponible</h3>
-                            <p className="text-lg text-gray-600 mb-6">
-                                Cette section est en cours de développement. Elle sera disponible très prochainement !
-                            </p>
-                            <button
-                                onClick={() => setActiveTab('profile')}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl hover:shadow-lg transition-all"
-                            >
-                                Retour aux Paramètres
-                            </button>
+
+                            <div className="p-8">
+                                <div className="bg-white border-2 border-red-200 rounded-xl p-6 mb-6">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+                                        <div>
+                                            <p className="font-bold text-red-900 mb-3">⚠️ Attention : cette action est IRRÉVERSIBLE</p>
+                                            <ul className="space-y-2 text-sm text-red-800">
+                                                <li>✕ Votre compte sera supprimé définitivement</li>
+                                                <li>✕ Tous vos paramètres seront perdus</li>
+                                                <li>✕ Tous vos feedbacks et données seront supprimés</li>
+                                                <li>✕ Cette action ne peut pas être annulée</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={submitDelete} className="space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-red-900 mb-3">
+                                            ⚠️ Pour confirmer, tapez "<span className="text-red-600 font-black">SUPPRIMER</span>" exactement *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="SUPPRIMER"
+                                            value={deleteData.confirmation}
+                                            onChange={(e) => setDeleteData('confirmation', e.target.value)}
+                                            className="w-full px-4 py-3 border-2 border-red-300 rounded-xl font-mono font-bold text-center text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={deleteProcessing || deleteData.confirmation !== 'SUPPRIMER'}
+                                        className="w-full flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-lg rounded-xl shadow-lg hover:shadow-xl hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300"
+                                    >
+                                        {deleteProcessing ? (
+                                            <>
+                                                <Loader2 className="w-6 h-6 animate-spin" />
+                                                Suppression en cours...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Trash2 className="w-6 h-6" />
+                                                Supprimer définitivement mon compte
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 )}

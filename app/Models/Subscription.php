@@ -73,9 +73,14 @@ class Subscription extends Model
 
     /**
      * Vérifie si la subscription est active
+     * Inclut past_due pour la grace period (14 jours avant downgrade forcé)
      */
     public function isActive(): bool
     {
+        if ($this->status === 'past_due') {
+            return true; // Grace period — ExpireOverdueSubscriptions gère le cutoff à 14j
+        }
+
         return $this->status === 'active' && 
                ($this->ends_at === null || $this->ends_at->isFuture());
     }

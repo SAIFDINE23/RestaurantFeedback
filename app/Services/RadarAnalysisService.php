@@ -382,10 +382,11 @@ PROMPT;
 		$entries = collect($feedbacks)
 			->take(120)
 			->map(function ($f, $index) {
+				$id = $f['id'] ?? '?';
 				$rating = $f['rating'] ?? 'N/A';
 				$comment = trim($f['comment'] ?? '');
 				$comment = mb_substr($comment, 0, 600);
-				return ($index + 1) . ") Note: {$rating}/5 | Commentaire: {$comment}";
+				return ($index + 1) . ") [ID:{$id}] Note: {$rating}/5 | Commentaire: {$comment}";
 			})
 			->implode("\n");
 
@@ -403,11 +404,12 @@ Contraintes:
 - Ne pas inventer de données.
 - Utiliser un ton professionnel et concis.
 - Se concentrer sur les problèmes concrets et actionnables.
+- Pour chaque problème, indiquer les IDs des feedbacks qui le mentionnent (champ feedback_ids).
 
 Format JSON attendu:
 {
 	"key_issues": [
-		{"title": "...", "detail": "...", "count": 0, "impact": "faible|moyen|fort"}
+		{"title": "...", "detail": "...", "count": 0, "impact": "faible|moyen|fort", "feedback_ids": [1, 2, 3]}
 	],
 	"confidence": "faible|moyenne|haute",
 	"note": "..."
