@@ -24,3 +24,6 @@ yarn-error.log
 
 check_brevo.php
 check_brevo.*
+
+# Backups locaux
+*.bak

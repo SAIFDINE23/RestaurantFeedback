@@ -55,9 +55,16 @@ class CheckCredits
             $credits->resetMonthlyCredits();
         }
 
+        // Les emails sont gratuits — seul l'envoi SMS consomme des crédits.
+        // La limite d'emails est gérée par le middleware plan.limits:feedbacks.
+        $channel = $request->input('channel');
+        if ($channel === 'email') {
+            return $next($request);
+        }
+
         if ($credits->credits_total_available < $minCredits) {
             return redirect()->route('subscription.index')
-                ->with('error', "Crédits insuffisants. Vous avez {$credits->credits_total_available} unités disponibles. Veuillez acheter des add-ons ou upgrader votre plan.");
+                ->with('error', "Crédits SMS insuffisants. Vous avez {$credits->credits_total_available} unités disponibles. Achetez des add-ons ou upgradez votre plan.");
         }
 
         return $next($request);

@@ -38,6 +38,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'onboarding_completed_at',
+        'onboarding_step',
     ];
 
     /**
@@ -58,8 +60,10 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'email_verified_at'         => 'datetime',
+            'password'                  => 'hashed',
+            'onboarding_completed_at'   => 'datetime',
+            'onboarding_step'           => 'integer',
         ];
     }
 }

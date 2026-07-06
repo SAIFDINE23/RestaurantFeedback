@@ -23,14 +23,17 @@ import {
     Smartphone,
     MessageSquare,
     QrCode,
+    Copy,
+    ExternalLink,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import QRCode from 'qrcode';
 
 /* ================================================================
    FEEDORA DASHBOARD — Professional SaaS Executive View
    ================================================================ */
 
-export default function Dashboard({ auth, stats, alerts, trends, goals, feedbackTrend }) {
+export default function Dashboard({ auth, stats, alerts, trends, goals, feedbackTrend, onboarding_completed, publicFeedbackUrl }) {
 
     // -------- Computed values --------
     const totalFeedbacks = stats.positive_count + stats.neutral_count + stats.negative_count;
@@ -67,6 +70,38 @@ export default function Dashboard({ auth, stats, alerts, trends, goals, feedback
             <Head title="Dashboard" />
 
             <div className="space-y-6">
+
+                {/* ============================================================
+                    ONBOARDING BANNER — shown until setup is complete
+                    ============================================================ */}
+                {!onboarding_completed && (
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-5 shadow-lg">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
+                            <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+                        </div>
+                        <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xl">🚀</span>
+                                </div>
+                                <div>
+                                    <p className="text-white font-bold text-sm">Configuration non terminée</p>
+                                    <p className="text-white/80 text-xs mt-0.5">
+                                        Complétez votre profil pour activer toutes les fonctionnalités Feedora.
+                                    </p>
+                                </div>
+                            </div>
+                            <Link
+                                href={route('onboarding.index')}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-white text-indigo-700 text-sm font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-sm flex-shrink-0"
+                            >
+                                Continuer la configuration
+                                <ArrowRight className="w-4 h-4" />
+                            </Link>
+                        </div>
+                    </div>
+                )}
 
                 {/* ============================================================
                     HERO SECTION — Score + Greeting + Quick Actions
@@ -260,6 +295,11 @@ export default function Dashboard({ auth, stats, alerts, trends, goals, feedback
                 <DashCard title="Distribution des notes" subtitle="Répartition par étoile" icon={<Star size={18} className="text-amber-500" />}>
                     <RatingDistribution ratings={stats.ratings} total={stats.feedbacks_completed || 1} />
                 </DashCard>
+
+                {/* ============================================================
+                    QR FEEDBACK URL — Lien public pour les tables
+                    ============================================================ */}
+                {publicFeedbackUrl && <PublicFeedbackCard url={publicFeedbackUrl} />}
 
                 {/* ============================================================
                     BOTTOM CTA — Radar IA
@@ -749,5 +789,94 @@ function RatingDistribution({ ratings, total }) {
                 </div>
             ))}
         </div>
+    );
+}
+
+/* ---------- Public Feedback URL Card ---------- */
+function PublicFeedbackCard({ url }) {
+    const [copied, setCopied] = useState(false);
+    const [qrDataUrl, setQrDataUrl] = useState('');
+
+    useEffect(() => {
+        if (url) {
+            QRCode.toDataURL(url, {
+                width: 200,
+                margin: 2,
+                color: { dark: '#111827', light: '#FFFFFF' },
+            }).then(setQrDataUrl).catch(() => {});
+        }
+    }, [url]);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    const handleDownloadQr = () => {
+        if (!qrDataUrl) return;
+        const link = document.createElement('a');
+        link.download = 'feedback-qr-code.png';
+        link.href = qrDataUrl;
+        link.click();
+    };
+
+    return (
+        <DashCard
+            title="Lien feedback QR table"
+            subtitle="Partagez ce lien ou scannez le QR code"
+            icon={<QrCode size={18} className="text-[#FF6F61]" />}
+        >
+            <div className="flex gap-4 items-start">
+                {/* QR Code */}
+                {qrDataUrl && (
+                    <div className="flex-shrink-0 flex flex-col items-center gap-2">
+                        <img
+                            src={qrDataUrl}
+                            alt="QR Code feedback"
+                            className="w-28 h-28 rounded-lg border border-gray-200 shadow-sm"
+                        />
+                        <button
+                            onClick={handleDownloadQr}
+                            className="text-xs text-[#FF6F61] hover:underline font-medium"
+                        >
+                            📥 Télécharger
+                        </button>
+                    </div>
+                )}
+
+                {/* URL + Actions */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3 border border-gray-100">
+                        <input
+                            type="text"
+                            readOnly
+                            value={url}
+                            className="flex-1 bg-transparent text-sm text-gray-700 font-mono truncate border-none focus:ring-0 p-0"
+                        />
+                        <button
+                            onClick={handleCopy}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                            <Copy size={13} />
+                            {copied ? 'Copié !' : 'Copier'}
+                        </button>
+                    </div>
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-[#FF6F61] text-white text-xs font-medium hover:bg-[#e55a4e] transition-colors"
+                    >
+                        <ExternalLink size={13} />
+                        Ouvrir le lien
+                    </a>
+                    <p className="text-xs text-gray-400 mt-3">
+                        💡 Imprimez le QR code et placez-le sur vos tables pour collecter des avis en temps réel.
+                    </p>
+                </div>
+            </div>
+        </DashCard>
     );
 }

@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionCredits;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class CompanyObserver
 {
@@ -18,6 +19,12 @@ class CompanyObserver
     public function created(Company $company): void
     {
         try {
+            // Générer le token de feedback public
+            if (!$company->feedback_public_token) {
+                $company->feedback_public_token = Str::random(12);
+                $company->saveQuietly();
+            }
+
             // Récupérer le plan FREE
             $freePlan = Plan::where('slug', 'free')->first();
 

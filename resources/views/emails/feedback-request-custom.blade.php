@@ -30,7 +30,6 @@
                     <tr>
                         <td align="center" style="padding:20px 24px 28px 24px;">
                             <a href="{{ $feedbackLink }}" style="display:inline-block; background:#f97316; color:#fff; text-decoration:none; font-weight:700; padding:14px 22px; border-radius:10px;">⭐ Donner mon avis</a>
-                            <p style="margin:12px 0 0 0; font-size:12px; color:#6b7280;">Lien direct : {{ $feedbackLink }}</p>
                         </td>
                     </tr>
                 </table>

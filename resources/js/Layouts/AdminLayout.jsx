@@ -87,15 +87,11 @@ export default function AdminLayout({ header, children }) {
 
     const navigation = [
         { name: 'Dashboard', href: 'admin.dashboard', icon: HomeIcon, current: route().current('admin.dashboard'), enabled: true },
-        { name: 'Radar IA', href: 'admin.radar', icon: RadarIcon, current: route().current('admin.radar'), enabled: true },
         { name: 'Entreprises', href: 'admin.companies', icon: BuildingIcon, current: route().current('admin.companies'), enabled: true },
         { name: 'Utilisateurs', href: 'admin.users', icon: UsersIcon, current: route().current('admin.users'), enabled: true },
-        { name: 'Feedbacks', href: 'admin.feedbacks', icon: ChatIcon, current: route().current('admin.feedbacks'), enabled: true },
-        { name: 'Demandes', href: 'admin.requests', icon: SendIcon, current: route().current('admin.requests'), enabled: true },
-        { name: 'Réponses', href: 'admin.replies', icon: ReplyIcon, current: route().current('admin.replies'), enabled: true },
-        { name: 'Analytique', href: 'admin.analytics', icon: ChartIcon, current: route().current('admin.analytics'), enabled: true },
         { name: 'Abonnements', href: 'admin.subscriptions', icon: CreditCardIcon, current: route().current('admin.subscriptions'), enabled: true },
-        { name: 'Canaux', href: 'admin.channels', icon: ChannelsIcon, current: route().current('admin.channels'), enabled: true },
+        { name: 'Radar IA', href: 'admin.radar', icon: RadarIcon, current: route().current('admin.radar'), enabled: true },
+        { name: 'Analytique', href: 'admin.analytics', icon: ChartIcon, current: route().current('admin.analytics'), enabled: true },
         { name: 'Paramètres', href: 'admin.settings', icon: SettingsIcon, current: route().current('admin.settings'), enabled: true },
     ];
 
@@ -117,19 +113,19 @@ export default function AdminLayout({ header, children }) {
 
             {/* Sidebar */}
             <aside className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-luminea-700 to-luminea-600 border-r border-luminea-500
-                transform transition-transform duration-300 ease-in-out
+                fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200
+                transform transition-transform duration-300 ease-in-out shadow-xl
                 lg:translate-x-0
                 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="flex flex-col h-full">
                     {/* Logo */}
-                    <div className="flex items-center gap-3 px-6 py-4 border-b border-luminea-500">
-                        <Link href={route('admin.dashboard')} className="flex items-center gap-3 hover:opacity-80 transition">
-                            <img src="/images/logo_Luminea.png" alt="Luminea" className="h-12 w-auto" />
-                            <div className="hidden sm:block">
-                                <h1 className="text-lg font-bold text-white">LUMINEA</h1>
-                                <p className="text-xs text-indigo-200">Admin</p>
+                    <div className="relative border-b border-gray-100">
+                        <Link href={route('admin.dashboard')} className="relative flex items-center gap-3 px-6 py-5 hover:bg-gray-50 transition-colors group">
+                            <img src="/images/logo_feedora.png" alt="Feedora" className="h-10 w-auto" />
+                            <div>
+                                <h1 className="text-xl font-bold text-feedora-500 tracking-tight">Feedora</h1>
+                                <p className="text-xs text-gray-500 font-medium">Console Admin</p>
                             </div>
                         </Link>
                     </div>
@@ -146,15 +142,15 @@ export default function AdminLayout({ header, children }) {
                                     key={item.name}
                                     href={route(item.href)}
                                     className={`
-                                        flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium
-                                        transition-colors duration-200
+                                        flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold
+                                        transition-all duration-200 group
                                         ${item.current 
-                                            ? 'bg-white text-luminea-700' 
-                                            : 'text-luminea-50 hover:bg-luminea-600'
+                                            ? 'bg-feedora-500 text-white shadow-lg shadow-feedora-500/30' 
+                                            : 'text-gray-700 hover:text-feedora-600 hover:bg-feedora-50'
                                         }
                                     `}
                                 >
-                                    <item.icon className={`w-5 h-5 ${item.current ? 'text-luminea-700' : 'text-luminea-200'}`} />
+                                    <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                                     {item.name}
                                 </Link>
                             );
@@ -162,18 +158,18 @@ export default function AdminLayout({ header, children }) {
                     </nav>
 
                     {/* User & Logout */}
-                    <div className="border-t border-luminea-500 p-4 space-y-2">
-                        <div className="flex items-center gap-3 px-4 py-3">
-                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                                <span className="text-luminea-700 font-semibold text-sm">
+                    <div className="relative border-t border-gray-100 p-4 space-y-3 bg-gray-50">
+                        <div className="relative flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-gray-200 group hover:border-feedora-200 transition-colors">
+                            <div className="w-11 h-11 bg-gradient-to-br from-feedora-400 to-feedora-600 rounded-full flex items-center justify-center ring-2 ring-feedora-100">
+                                <span className="text-white font-bold text-base">
                                     {user?.name?.charAt(0).toUpperCase() || 'A'}
                                 </span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-white truncate">
+                                <p className="text-sm font-semibold text-gray-900 truncate">
                                     {user?.name || 'Admin'}
                                 </p>
-                                <p className="text-xs text-luminea-100 truncate">
+                                <p className="text-xs text-gray-500 truncate">
                                     {user?.email || 'admin@example.com'}
                                 </p>
                             </div>
@@ -181,7 +177,7 @@ export default function AdminLayout({ header, children }) {
                         
                         <button
                             onClick={handleLogout}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-white hover:bg-luminea-600 transition-colors duration-200"
+                            className="relative w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-red-600 hover:text-white hover:bg-red-600 border border-red-200 hover:border-red-600 transition-all duration-200 group"
                         >
                             <LogoutIcon className="w-5 h-5" />
                             Déconnexion
@@ -191,14 +187,14 @@ export default function AdminLayout({ header, children }) {
             </aside>
 
             {/* Main content */}
-            <div className="lg:pl-64">
+            <div className="lg:pl-72">
                 {/* Top header */}
                 <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
                     <div className="flex items-center justify-between px-6 py-4">
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => setSidebarOpen(true)}
-                                className="lg:hidden p-2 text-gray-500 hover:text-gray-700"
+                                className="lg:hidden p-2 text-gray-500 hover:text-feedora-600 hover:bg-feedora-50 rounded-lg transition-colors"
                             >
                                 <MenuIcon className="w-6 h-6" />
                             </button>
@@ -206,8 +202,8 @@ export default function AdminLayout({ header, children }) {
                         </div>
                         
                         <div className="flex items-center gap-4">
-                            <span className="px-3 py-1 bg-luminea-100 text-luminea-800 text-xs font-semibold rounded-full">
-                                ADMIN
+                            <span className="px-3 py-1 bg-feedora-100 text-feedora-700 text-xs font-semibold rounded-full">
+                                FEEDORA ADMIN
                             </span>
                         </div>
                     </div>

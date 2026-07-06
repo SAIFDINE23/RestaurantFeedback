@@ -17,7 +17,7 @@ class FeedbackTemplateService
         return [
             'sms_template' => "🍽️ Bonjour {{customer_name}} !\nMerci d'avoir choisi {{company_name}} ❤️\n\nVotre avis compte énormément pour nous !\n👉 {{feedback_link}}\n\n⭐ Cela ne prend que 30 secondes.\nMerci 🙏",
             'email_subject_template' => "🍽️ {{company_name}} — Votre avis compte pour nous !",
-            'email_body_template' => "Bonjour {{customer_name}},\n\nMerci d'avoir choisi {{company_name}}.\n\nVotre avis est précieux pour notre équipe.\nPouvez-vous nous donner votre retour en cliquant sur le lien ci-dessous ?\n\n{{feedback_link}}\n\nMerci d'avance 🙏\nL'équipe {{company_name}}",
+            'email_body_template' => "Bonjour {{customer_name}},\n\nMerci d'avoir choisi {{company_name}}.\n\nVotre avis est précieux pour notre équipe.\nPouvez-vous nous donner votre retour en cliquant sur le bouton ci-dessous ?\n\nMerci d'avance 🙏\nL'équipe {{company_name}}",
             'qr_template' => "Scannez ce QR Code pour laisser votre avis en 30 secondes ⭐",
         ];
     }

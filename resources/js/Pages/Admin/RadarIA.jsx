@@ -196,7 +196,7 @@ export default function RadarIA({ period, kpis, sentiment, ops, companiesAtRisk,
 
             <div className="py-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    <div className="rounded-2xl bg-gradient-to-r from-luminea-700 to-luminea-600 shadow-lg overflow-hidden border border-luminea-600 mb-8">
+                    <div className="rounded-2xl bg-gradient-to-r from-feedora-600 to-feedora-500 shadow-lg overflow-hidden border border-feedora-500 mb-8">
                         <div className="p-6">
                             <div className="flex items-start justify-between flex-wrap gap-4">
                                 <div>
@@ -209,15 +209,15 @@ export default function RadarIA({ period, kpis, sentiment, ops, companiesAtRisk,
                                             {period?.days ?? 30}j
                                         </span>
                                     </div>
-                                    <p className="mt-2 text-sm text-luminea-50/90">
+                                    <p className="mt-2 text-sm text-feedora-50/90">
                                         Période: <span className="font-semibold text-white">{period?.from}</span> → <span className="font-semibold text-white">{period?.to}</span>
                                     </p>
                                     <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                        <span className="text-xs text-luminea-50/90">
+                                        <span className="text-xs text-feedora-50/90">
                                             Dernière mise à jour: <span className="font-semibold text-white">{lastUpdated}</span>
                                         </span>
                                         <span className="hidden sm:inline text-white/40">•</span>
-                                        <span className="text-xs text-luminea-50/90">
+                                        <span className="text-xs text-feedora-50/90">
                                             Confiance: <span className="font-semibold text-white">{analysis?.confidence ?? '—'}</span>
                                         </span>
                                         {analysis?.cached && (
@@ -239,7 +239,7 @@ export default function RadarIA({ period, kpis, sentiment, ops, companiesAtRisk,
                                         type="button"
                                         onClick={onRegenerate}
                                         disabled={regenerating}
-                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-luminea-700 text-sm font-semibold hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-feedora-700 text-sm font-semibold hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
                                         {regenerating ? 'Régénération…' : 'Régénérer'}
                                     </button>

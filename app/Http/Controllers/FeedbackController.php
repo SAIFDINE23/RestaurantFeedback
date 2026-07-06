@@ -112,6 +112,24 @@ class FeedbackController extends Controller
             ->whereNotIn('status', ['completed', 'expired'])
             ->firstOrFail();
 
+        // 🛡️ Anti-fraude : limiter les feedbacks reçus pour les plans avec max_feedbacks
+        $company = $feedbackRequest->company;
+        $plan = $company->subscription?->plan;
+
+        if ($plan && $plan->max_feedbacks !== null) {
+            $receivedThisMonth = Feedback::whereHas('feedbackRequest', function ($q) use ($company) {
+                $q->where('company_id', $company->id);
+            })->whereMonth('created_at', now()->month)
+              ->whereYear('created_at', now()->year)
+              ->count();
+
+            if ($receivedThisMonth >= $plan->max_feedbacks) {
+                return Inertia::render('Feedback/LimitReached', [
+                    'company' => $company->name,
+                ]);
+            }
+        }
+
         // ✅ Création du feedback
         $feedback = Feedback::create([
             'feedback_request_id' => $feedbackRequest->id,

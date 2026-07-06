@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RadarAnalysis;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class RadarAnalysisService
 {
@@ -31,7 +32,11 @@ class RadarAnalysisService
 				->latest('analyzed_at')
 				->first();
 
-			if ($cachedAnalysis) {
+			$cachedStatus = $cachedAnalysis?->analysis_data['status'] ?? null;
+
+			// Ne jamais figer une analyse fallback en cache :
+			// si Gemini revient, on régénère automatiquement.
+			if ($cachedAnalysis && $cachedStatus !== 'fallback') {
 				return array_merge(
 					$cachedAnalysis->analysis_data,
 					[
@@ -45,14 +50,16 @@ class RadarAnalysisService
 
 		$analysis = $this->analyzeGlobal($feedbacks, $sentimentStats, $context);
 
-		RadarAnalysis::create([
-			'company_id' => null,
-			'feedback_hash' => $feedbackHash,
-			'feedbacks_count' => count($feedbacks),
-			'feedbacks_with_comments' => $feedbacksWithComments,
-			'analysis_data' => $analysis,
-			'analyzed_at' => now(),
-		]);
+		if (($analysis['status'] ?? null) !== 'fallback') {
+			RadarAnalysis::create([
+				'company_id' => null,
+				'feedback_hash' => $feedbackHash,
+				'feedbacks_count' => count($feedbacks),
+				'feedbacks_with_comments' => $feedbacksWithComments,
+				'analysis_data' => $analysis,
+				'analyzed_at' => now(),
+			]);
+		}
 
 		return array_merge($analysis, ['cached' => false, 'forced' => $force]);
 	}
@@ -81,8 +88,12 @@ class RadarAnalysisService
 			->latest('analyzed_at')
 			->first();
 
-		// 3️⃣ Si trouvée, retourner le cache avec metadata
-		if ($cachedAnalysis) {
+		$cachedStatus = $cachedAnalysis?->analysis_data['status'] ?? null;
+
+		// 3️⃣ Si trouvée et exploitable, retourner le cache avec metadata
+		// On ignore volontairement les analyses fallback pour permettre une
+		// récupération automatique dès que Gemini refonctionne.
+		if ($cachedAnalysis && $cachedStatus !== 'fallback') {
 			return array_merge(
 				$cachedAnalysis->analysis_data,
 				[
@@ -96,15 +107,17 @@ class RadarAnalysisService
 		// 4️⃣ Sinon, générer une nouvelle analyse
 		$analysis = $this->analyze($feedbacks, $sentimentStats);
 
-		// 5️⃣ Sauvegarder l'analyse en cache
-		RadarAnalysis::create([
-			'company_id' => $companyId,
-			'feedback_hash' => $feedbackHash,
-			'feedbacks_count' => count($feedbacks),
-			'feedbacks_with_comments' => $feedbacksWithComments,
-			'analysis_data' => $analysis,
-			'analyzed_at' => now(),
-		]);
+		// 5️⃣ Sauvegarder uniquement les analyses IA réussies
+		if (($analysis['status'] ?? null) !== 'fallback') {
+			RadarAnalysis::create([
+				'company_id' => $companyId,
+				'feedback_hash' => $feedbackHash,
+				'feedbacks_count' => count($feedbacks),
+				'feedbacks_with_comments' => $feedbacksWithComments,
+				'analysis_data' => $analysis,
+				'analyzed_at' => now(),
+			]);
+		}
 
 		return array_merge($analysis, ['cached' => false]);
 	}
@@ -146,7 +159,9 @@ class RadarAnalysisService
 			$url = 'https://generativelanguage.googleapis.com/v1beta/' . $model
 				. '?key=' . urlencode($apiKey);
 
-			$response = Http::post($url, [
+			$response = Http::timeout(30)
+				->retry(2, 500)
+				->post($url, [
 				'contents' => [
 					[
 						'parts' => [
@@ -157,6 +172,10 @@ class RadarAnalysisService
 			]);
 
 			if (! $response->successful()) {
+				Log::warning('RadarIA global Gemini API error', [
+					'status' => $response->status(),
+					'body' => mb_substr($response->body(), 0, 1000),
+				]);
 				return $this->fallbackGlobalAnalysis($sentimentStats, $context, 'Erreur Gemini API, analyse locale utilisée.');
 			}
 
@@ -182,6 +201,9 @@ class RadarAnalysisService
 				'note' => $parsed['note'] ?? null,
 			];
 		} catch (\Throwable $e) {
+			Log::warning('RadarIA global Gemini exception', [
+				'error' => $e->getMessage(),
+			]);
 			return $this->fallbackGlobalAnalysis($sentimentStats, $context, 'Exception IA, analyse locale utilisée.');
 		}
 	}
@@ -341,7 +363,9 @@ PROMPT;
 			$url = 'https://generativelanguage.googleapis.com/v1beta/' . $model
 				. '?key=' . urlencode($apiKey);
 
-			$response = Http::post($url, [
+			$response = Http::timeout(30)
+				->retry(2, 500)
+				->post($url, [
 				'contents' => [
 					[
 						'parts' => [
@@ -352,6 +376,11 @@ PROMPT;
 			]);
 
 			if (! $response->successful()) {
+				Log::warning('RadarIA company Gemini API error', [
+					'status' => $response->status(),
+					'body' => mb_substr($response->body(), 0, 1000),
+					'feedbacks_count' => count($feedbacks),
+				]);
 				return $this->fallbackAnalysis($feedbacks, $sentimentStats, 'Erreur Gemini API, analyse locale utilisée.');
 			}
 
@@ -373,6 +402,10 @@ PROMPT;
 				'note' => $parsed['note'] ?? null,
 			];
 		} catch (\Throwable $e) {
+			Log::warning('RadarIA company Gemini exception', [
+				'error' => $e->getMessage(),
+				'feedbacks_count' => count($feedbacks),
+			]);
 			return $this->fallbackAnalysis($feedbacks, $sentimentStats, 'Exception IA, analyse locale utilisée.');
 		}
 	}

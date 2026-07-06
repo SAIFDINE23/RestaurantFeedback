@@ -12,13 +12,15 @@ use App\Http\Controllers\{
     FeedbackController,
     FeedbackDesignController,
     FeedbackRequestController,
+    OnboardingController,
     ProfileController,
     FeedbackReplyController,
     TaskController,
     PricingController,
     SubscriptionController,
     StripeController,
-    PublicFormController
+    PublicFormController,
+    PublicFeedbackController
 };
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminRadarController;
@@ -82,11 +84,30 @@ Route::post('/join/{token}', [PublicFormController::class, 'store'])
 
 /*
 |--------------------------------------------------------------------------
+| Feedback public via QR table (sans authentification)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/f/{token}', [PublicFeedbackController::class, 'show'])
+    ->name('public.feedback.show');
+
+Route::post('/f/{token}', [PublicFeedbackController::class, 'store'])
+    ->name('public.feedback.store');
+
+/*
+|--------------------------------------------------------------------------
 | Authenticated routes
 |--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
+    /*
+    | Onboarding (new user setup wizard)
+    */
+    Route::get('/onboarding',              [OnboardingController::class, 'index'])    ->name('onboarding.index');
+    Route::post('/onboarding/step/{step}', [OnboardingController::class, 'saveStep'])->name('onboarding.step');
+    Route::post('/onboarding/skip',        [OnboardingController::class, 'skip'])    ->name('onboarding.skip');
 
     // Liste de tous les feedbacks
     Route::get('/feedbacks', [FeedbackController::class, 'index'])

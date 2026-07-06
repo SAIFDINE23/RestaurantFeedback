@@ -17,6 +17,7 @@ class Company extends Model
         'google_review_url',
         'stripe_customer_id',
         'qr_code_token',
+        'feedback_public_token',
         'logo_url',
         'design_settings',
         'review_platforms',
@@ -137,10 +138,30 @@ class Company extends Model
     }
 
     /**
-     * Récupère l'URL du formulaire public
+     * Récupère l'URL du formulaire public (collecte contacts)
      */
     public function getPublicFormUrl(): string
     {
         return route('public.form.show', ['token' => $this->qr_code_token ?? $this->generateQrCodeToken()]);
+    }
+
+    /**
+     * Génère un token unique pour le feedback public si absent
+     */
+    public function generateFeedbackPublicToken(): string
+    {
+        if (!$this->feedback_public_token) {
+            $this->feedback_public_token = \Illuminate\Support\Str::random(12);
+            $this->save();
+        }
+        return $this->feedback_public_token;
+    }
+
+    /**
+     * Récupère l'URL publique de feedback (QR table)
+     */
+    public function getPublicFeedbackUrl(): string
+    {
+        return route('public.feedback.show', ['token' => $this->feedback_public_token ?? $this->generateFeedbackPublicToken()]);
     }
 }

@@ -1,10 +1,157 @@
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
-import AdminLayout from '@/Layouts/AdminLayout';
+import DashboardExecutive from './DashboardExecutive';
 
-export default function AdminDashboard({ stats, ratingDistribution, replyStats, feedbackEvolution, topCompanies, sectorStats, recentFeedbacks, channelStats, companiesResponseRate }) {
-    // Fonction pour obtenir la couleur selon la note
-    const getRatingColor = (rating) => {
+export default DashboardExecutive;
+
+/*
+            function focusTone(tone) {
+                if (tone === 'danger') return 'bg-rose-50 border-rose-200 text-rose-800';
+                if (tone === 'warning') return 'bg-amber-50 border-amber-200 text-amber-800';
+                if (tone === 'success') return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                return 'bg-blue-50 border-blue-200 text-blue-800';
+            }
+
+            function formatNumber(value = 0) {
+                return new Intl.NumberFormat('fr-FR').format(Number(value || 0));
+            }
+
+            function formatPercent(value = 0) {
+                return `${Number(value || 0).toFixed(1)}%`;
+            }
+
+            function formatMoney(value = 0, currency = 'EUR') {
+                return new Intl.NumberFormat('fr-FR', {
+                    style: 'currency',
+                    currency,
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                }).format(Number(value || 0));
+            }
+                                        <div key={plan.slug}>
+                                            <div className="flex items-center justify-between text-sm mb-1">
+                                                <span className="font-medium text-gray-700">{plan.name}</span>
+                                                <span className="text-gray-500">{formatNumber(plan.count)} ({plan.percentage}%)</span>
+                                            </div>
+                                            <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                                                <div className="h-full rounded-full bg-gradient-to-r from-feedora-400 to-feedora-600" style={{ width: `${plan.percentage}%` }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </SectionCard>
+
+                        <SectionCard title="Product & ops health" subtitle="Qualité d’adoption et efficacité plateforme">
+                            <div className="space-y-4">
+                                {(operationalHealth || []).map((item) => (
+                                    <div key={item.label}>
+                                        <div className="flex items-center justify-between text-sm mb-1.5">
+                                            <span className="font-medium text-gray-700">{item.label}</span>
+                                            <span className="text-gray-500">
+                                                {item.value}{item.unit} / cible {item.target}{item.unit}
+                                            </span>
+                                        </div>
+                                        <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${item.value >= item.target ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-gradient-to-r from-amber-400 to-feedora-500'}`}
+                                                style={{ width: `${Math.min(100, item.value)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                                    <MetricTile label="IA replies 30j" value={formatNumber(stats?.aiRepliesLast30 || 0)} />
+                                    <MetricTile label="Usage crédits" value={formatPercent(stats?.creditsUsageRate || 0)} />
+                                    <MetricTile label="Note moyenne 30j" value={stats?.avgRating ? `${stats.avgRating}/5` : '—'} />
+                                    <MetricTile label="Taux de réponse" value={formatPercent(stats?.responseRate || 0)} />
+                                </div>
+                            </div>
+                        </SectionCard>
+                    </div>
+                </div>
+            </div>
+        </AdminLayout>
+    );
+}
+
+* /
+* /
+    
+    function HeroStat({ label, value }) {
+        return (
+            <div className="rounded-xl bg-white/10 border border-white/15 px-4 py-4 backdrop-blur-sm">
+                <p className="text-xs uppercase tracking-wide text-white/75 font-semibold">{label}</p>
+                <p className="text-2xl font-bold mt-1 text-white">{value}</p>
+            </div>
+        );
+    }
+    
+    function KpiCard({ label, value, hint, color }) {
+        return (
+            <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <div className="p-5">
+                    <p className="text-sm font-medium text-gray-600">{label}</p>
+                    <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+                    <p className="text-xs text-gray-500 mt-2">{hint}</p>
+                </div>
+                <div className={`h-1.5 w-full bg-gradient-to-r ${color}`} />
+            </div>
+        );
+    }
+    
+    function SectionCard({ title, subtitle, children, className = '' }) {
+        return (
+            <div className={`bg-white rounded-xl shadow-lg border border-gray-100 p-6 ${className}`}>
+                <div className="mb-5">
+                    <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+                </div>
+                {children}
+            </div>
+        );
+    }
+    
+    function MiniMetric({ label, value }) {
+        return (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{label}</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{value}</p>
+            </div>
+        );
+    }
+    
+    function MetricTile({ label, value }) {
+        return (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{label}</p>
+                <p className="text-xl font-bold text-gray-900 mt-2">{value}</p>
+            </div>
+        );
+    }
+    
+    function GrowthBars({ data = [], maxValue = 1 }) {
+        return (
+            <div className="grid grid-cols-6 gap-4 items-end h-72">
+                {data.map((item) => (
+                    <div key={item.label} className="h-full flex flex-col justify-end">
+                        <div className="flex items-end justify-center gap-1 h-full">
+                            <div className="w-4 rounded-t bg-blue-300" style={{ height: `${Math.max(((item.companies || 0) / maxValue) * 100, 4)}%` }} title={`Entreprises: ${item.companies}`} />
+                            <div className="w-4 rounded-t bg-feedora-500" style={{ height: `${Math.max(((item.requests || 0) / maxValue) * 100, 4)}%` }} title={`Demandes: ${item.requests}`} />
+                            <div className="w-4 rounded-t bg-emerald-400" style={{ height: `${Math.max(((item.feedbacks || 0) / maxValue) * 100, 4)}%` }} title={`Feedbacks: ${item.feedbacks}`} />
+                        </div>
+                        <div className="mt-3 text-center text-xs font-medium text-gray-500">{item.label}</div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+    
+    function focusTone(tone) {
+        if (tone === 'danger') return 'bg-rose-50 border-rose-200 text-rose-800';
+        if (tone === 'warning') return 'bg-amber-50 border-amber-200 text-amber-800';
+        if (tone === 'success') return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+        return 'bg-blue-50 border-blue-200 text-blue-800';
+    }
         if (rating >= 4) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
         if (rating >= 3) return 'text-amber-600 bg-amber-50 border-amber-200';
         return 'text-red-600 bg-red-50 border-red-200';
@@ -69,7 +216,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
 
             <div className="py-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    {/* Header avec badge */}
+                    {/* Header avec badge * /}
                     <div className="mb-8">
                         <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
@@ -90,7 +237,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                         </div>
                     </div>
 
-                    {/* Insight automatique */}
+                    {/* Insight automatique * /}
                     {insight && (
                         <div className={`mb-8 p-6 rounded-xl border-2 ${
                             insight.type === 'success' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' :
@@ -107,9 +254,9 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                         </div>
                     )}
 
-                    {/* KPIs Cards - Design amélioré */}
+                    {/* KPIs Cards - Design amélioré * /}
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-                        {/* Entreprises */}
+                        {/* Entreprises * /}
                         <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
                             <div className="p-6">
                                 <div className="flex items-center justify-between">
@@ -132,7 +279,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                             </div>
                         </div>
 
-                        {/* Clients */}
+                        {/* Clients * /}
                         <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
                             <div className="p-6">
                                 <div className="flex items-center justify-between">
@@ -150,7 +297,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                             </div>
                         </div>
 
-                        {/* Feedbacks */}
+                        {/* Feedbacks * /}
                         <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
                             <div className="p-6">
                                 <div className="flex items-center justify-between">
@@ -173,7 +320,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                             </div>
                         </div>
 
-                        {/* Taux de réponse */}
+                        {/* Taux de réponse * /}
                         <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
                             <div className="p-6">
                                 <div className="flex items-center justify-between">
@@ -192,9 +339,9 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                         </div>
                     </div>
 
-                    {/* Métriques avancées */}
+                    {/* Métriques avancées * /}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                        {/* NPS Score */}
+                        {/* NPS Score * /}
                         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-sm font-medium opacity-90">Net Promoter Score</h3>
@@ -208,117 +355,9 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                             </div>
                             <div className="mt-4 pt-4 border-t border-white/20">
                                 <p className="text-xs opacity-75">
-                                    {stats.npsScore >= 50 ? 'Excellent' : stats.npsScore >= 0 ? 'Bon' : 'À améliorer'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Satisfaction Rate */}
-                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-medium opacity-90">Taux de Satisfaction</h3>
-                                <svg className="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold">{stats.satisfactionRate}%</p>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-white/20">
-                                <p className="text-xs opacity-75">Clients avec 4-5 étoiles</p>
-                            </div>
-                        </div>
-
-                        {/* Note Moyenne */}
-                        <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl shadow-lg p-6 text-white">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-medium opacity-90">Note Moyenne</h3>
-                                <svg className="w-6 h-6 opacity-80" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold">{stats.averageRating}</p>
-                                <span className="text-sm opacity-75">/ 5</span>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-white/20">
-                                <p className="text-xs opacity-75">Sur {formatNumber(stats.totalFeedbacks)} feedbacks</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Note moyenne et répartition - Design amélioré */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                        {/* Note moyenne */}
-                        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Note moyenne globale</h3>
-                            <div className="flex flex-col items-center justify-center py-8">
-                                <div className="relative">
-                                    <div className="text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-                                        {stats.averageRating}
-                                    </div>
-                                    <div className="absolute -top-2 -right-2 text-4xl">⭐</div>
-                                </div>
-                                <p className="text-sm text-gray-500 mt-4">
-                                    Basé sur {stats.totalFeedbacks} feedbacks
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Répartition des notes */}
-                        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Répartition des notes</h3>
-                            <div className="space-y-4">
-                                {[5, 4, 3, 2, 1].map((rating) => {
-                                    const count = ratingDistribution[rating] || 0;
-                                    const percentage = stats.totalFeedbacks > 0 
-                                        ? (count / stats.totalFeedbacks) * 100 
-                                        : 0;
-                                    
-                                    return (
-                                        <div key={rating} className="space-y-2">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-lg">{getRatingIcon(rating)}</span>
-                                                    <span className="font-medium text-gray-700">{rating} étoiles</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-gray-600 font-medium">{count}</span>
-                                                    <span className="text-gray-500 w-12 text-right">{percentage.toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-500 ${
-                                                        rating >= 4 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
-                                                        rating >= 3 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
-                                                        'bg-gradient-to-r from-red-400 to-red-500'
-                                                    }`}
-                                                    style={{ width: `${percentage}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Graphique d'évolution - Line Chart */}
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 mb-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Évolution des feedbacks</h3>
-                                <p className="text-sm text-gray-500 mt-1">30 derniers jours</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-indigo-500"></div>
-                                <span className="text-xs text-gray-600 font-medium">Feedbacks</span>
-                            </div>
-                        </div>
                         {feedbackEvolution && feedbackEvolution.length > 0 ? (
                             <div className="relative">
-                                {/* Grille de fond avec labels */}
+                                {/* Grille de fond avec labels * /}
                                 <div className="absolute inset-0 flex flex-col justify-between pb-12 pr-4">
                                     {[maxCount, Math.floor(maxCount * 0.75), Math.floor(maxCount * 0.5), Math.floor(maxCount * 0.25), 0].map((value, idx) => (
                                         <div key={idx} className="flex items-center">
@@ -328,10 +367,10 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                     ))}
                                 </div>
                                 
-                                {/* Graphique linéaire */}
+                                {/* Graphique linéaire * /}
                                 <div className="relative h-64 ml-10">
                                     <svg className="w-full h-full" viewBox="0 0 1000 256" preserveAspectRatio="none">
-                                        {/* Dégradé sous la courbe */}
+                                        {/* Dégradé sous la courbe * /}
                                         <defs>
                                             <linearGradient id="areaGradient" x1="0" x2="0" y1="0" y2="1">
                                                 <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
@@ -339,7 +378,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                             </linearGradient>
                                         </defs>
                                         
-                                        {/* Zone sous la courbe */}
+                                        {/* Zone sous la courbe * /}
                                         <path
                                             d={(() => {
                                                 const points = feedbackEvolution.map((item, index) => {
@@ -352,7 +391,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                             fill="url(#areaGradient)"
                                         />
                                         
-                                        {/* Ligne principale */}
+                                        {/* Ligne principale * /}
                                         <polyline
                                             points={feedbackEvolution.map((item, index) => {
                                                 const x = (index / (feedbackEvolution.length - 1)) * 1000;
@@ -367,7 +406,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                             className="drop-shadow-lg"
                                         />
                                         
-                                        {/* Points interactifs */}
+                                        {/* Points interactifs * /}
                                         {feedbackEvolution.map((item, index) => {
                                             const x = (index / (feedbackEvolution.length - 1)) * 1000;
                                             const y = 256 - (maxCount > 0 ? (item.count / maxCount) * 256 : 0);
@@ -376,7 +415,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                             
                                             return (
                                                 <g key={index} className="group">
-                                                    {/* Point */}
+                                                    {/* Point * /}
                                                     <circle
                                                         cx={x}
                                                         cy={y}
@@ -400,7 +439,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                         })}
                                     </svg>
                                     
-                                    {/* Labels de dates */}
+                                    {/* Labels de dates * /}
                                     <div className="absolute bottom-0 left-0 right-0 flex justify-between mt-2 px-1">
                                         {feedbackEvolution.map((item, index) => {
                                             if (index % 5 !== 0) return null;
@@ -415,7 +454,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                                     </div>
                                 </div>
                                 
-                                {/* Légende */}
+                                {/* Légende * /}
                                 <div className="flex items-center justify-center gap-4 mt-8 pt-4 border-t border-gray-100">
                                     <div className="flex items-center gap-2">
                                         <div className="w-3 h-0.5 bg-indigo-500"></div>
@@ -439,9 +478,9 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                         )}
                     </div>
 
-                    {/* Réponses IA vs Admin et Top entreprises */}
+                    {/* Réponses IA vs Admin et Top entreprises * /}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                        {/* Réponses générées */}
+                        {/* Réponses générées * /}
                         <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-6">Réponses générées</h3>
                             <div className="space-y-4">
@@ -481,7 +520,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                             </div>
                         </div>
 
-                        {/* Top entreprises */}
+                        {/* Top entreprises * /}
                         <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 mb-6">Top entreprises</h3>
                             <div className="space-y-3">
@@ -515,7 +554,7 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
                         </div>
                     </div>
 
-                    {/* Feedbacks récents - Tableau amélioré */}
+                    {/* Feedbacks récents - Tableau amélioré * /}
                     <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200">
                             <h3 className="text-lg font-semibold text-gray-900">Feedbacks récents</h3>
@@ -574,3 +613,5 @@ export default function AdminDashboard({ stats, ratingDistribution, replyStats, 
         </AdminLayout>
     );
 }
+
+*/

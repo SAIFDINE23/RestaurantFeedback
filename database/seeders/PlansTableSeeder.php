@@ -24,9 +24,9 @@ class PlansTableSeeder extends Seeder
             'billing_period' => 'month',
             
             // Quotas
-            'sms_quota_monthly' => 20, // Ancien champ (dépendance)
-            'credits_monthly' => 20, // 20 unités/mois (~0.90€ coût)
-            'email_unlimited' => true,
+            'sms_quota_monthly' => 0,
+            'credits_monthly' => 0,
+            'email_unlimited' => false,
             
             // Limites
             'max_restaurants' => 1,
@@ -58,8 +58,8 @@ class PlansTableSeeder extends Seeder
             'billing_period' => 'month',
             
             // Quotas
-            'sms_quota_monthly' => 200,
-            'credits_monthly' => 200, // 200 unités/mois (~9€ coût, 70% marge)
+            'sms_quota_monthly' => 100,
+            'credits_monthly' => 100,
             'email_unlimited' => true,
             
             // Limites
@@ -94,8 +94,8 @@ class PlansTableSeeder extends Seeder
             'billing_period' => 'month',
             
             // Quotas
-            'sms_quota_monthly' => 400,
-            'credits_monthly' => 400, // 400 unités/mois (~18€ coût, 70% marge)
+            'sms_quota_monthly' => 200,
+            'credits_monthly' => 200,
             'email_unlimited' => true,
             
             // Limites

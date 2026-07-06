@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\User;
+use App\Mail\WelcomeMail;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -55,7 +57,14 @@ class RegisteredUserController extends Controller
 
     Auth::login($user);
 
-    return redirect(route('dashboard'));
+    // Send welcome email (silently — don't block registration on mail failure)
+    try {
+        Mail::to($user->email)->send(new WelcomeMail($user, $request->company_name));
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::warning('Welcome email failed: ' . $e->getMessage());
+    }
+
+    return redirect(route('onboarding.index'));
 }
 
 }

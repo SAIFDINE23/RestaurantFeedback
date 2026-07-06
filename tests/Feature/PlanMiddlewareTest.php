@@ -40,11 +40,11 @@ class PlanMiddlewareTest extends TestCase
 
         SubscriptionCredits::create([
             'subscription_id' => $subscription->id,
-            'credits_monthly' => 20,
-            'credits_available_monthly' => 20,
+            'credits_monthly' => (float) $freePlan->credits_monthly,
+            'credits_available_monthly' => (float) $freePlan->credits_monthly,
             'credits_used_monthly' => 0,
             'credits_addon_balance' => 0,
-            'credits_total_available' => 20,
+            'credits_total_available' => (float) $freePlan->credits_monthly,
             'last_reset_date' => now(),
         ]);
 
@@ -74,11 +74,11 @@ class PlanMiddlewareTest extends TestCase
 
         SubscriptionCredits::create([
             'subscription_id' => $subscription->id,
-            'credits_monthly' => 200,
-            'credits_available_monthly' => 200,
+            'credits_monthly' => (float) $basicPlan->credits_monthly,
+            'credits_available_monthly' => (float) $basicPlan->credits_monthly,
             'credits_used_monthly' => 0,
             'credits_addon_balance' => 0,
-            'credits_total_available' => 200,
+            'credits_total_available' => (float) $basicPlan->credits_monthly,
             'last_reset_date' => now(),
         ]);
 
@@ -108,11 +108,11 @@ class PlanMiddlewareTest extends TestCase
 
         SubscriptionCredits::create([
             'subscription_id' => $subscription->id,
-            'credits_monthly' => 400,
-            'credits_available_monthly' => 400,
+            'credits_monthly' => (float) $proPlan->credits_monthly,
+            'credits_available_monthly' => (float) $proPlan->credits_monthly,
             'credits_used_monthly' => 0,
             'credits_addon_balance' => 0,
-            'credits_total_available' => 400,
+            'credits_total_available' => (float) $proPlan->credits_monthly,
             'last_reset_date' => now(),
         ]);
 
@@ -136,7 +136,7 @@ class PlanMiddlewareTest extends TestCase
     }
 
     /** @test */
-    public function user_without_credits_cannot_send_feedback()
+    public function user_without_credits_cannot_send_sms()
     {
         $user = User::factory()->create();
         $company = Company::create([
@@ -153,19 +153,19 @@ class PlanMiddlewareTest extends TestCase
             'phone' => '+33612345678',
         ]);
 
-        $freePlan = Plan::where('slug', 'free')->first();
+        $basicPlan = Plan::where('slug', 'basic')->first();
         $subscription = Subscription::create([
             'company_id' => $company->id,
-            'plan_id' => $freePlan->id,
+            'plan_id' => $basicPlan->id,
             'status' => 'active',
             'starts_at' => now(),
         ]);
 
         SubscriptionCredits::create([
             'subscription_id' => $subscription->id,
-            'credits_monthly' => 20,
-            'credits_available_monthly' => 0, // No credits
-            'credits_used_monthly' => 20,
+            'credits_monthly' => (float) $basicPlan->credits_monthly,
+            'credits_available_monthly' => 0, // No credits left
+            'credits_used_monthly' => (float) $basicPlan->credits_monthly,
             'credits_addon_balance' => 0,
             'credits_total_available' => 0,
             'last_reset_date' => now(),
@@ -176,12 +176,60 @@ class PlanMiddlewareTest extends TestCase
             'channel' => 'sms',
         ]);
 
-        // Should be blocked by credits middleware
+        // Should be blocked by credits middleware for SMS
         $response->assertRedirect(route('subscription.index'));
         $this->assertTrue(
             session()->has('error') && 
             (str_contains(strtolower(session('error')), 'crédit') || 
              str_contains(strtolower(session('error')), 'credit'))
+        );
+    }
+
+    /** @test */
+    public function free_plan_can_send_email_without_sms_credits()
+    {
+        $user = User::factory()->create();
+        $company = Company::create([
+            'user_id' => $user->id,
+            'name' => 'Test Restaurant',
+            'sector' => 'restaurant',
+        ]);
+
+        $customer = \App\Models\Customer::create([
+            'company_id' => $company->id,
+            'name' => 'Test Customer',
+            'email' => 'test@example.com',
+        ]);
+
+        $freePlan = Plan::where('slug', 'free')->first();
+        $subscription = Subscription::create([
+            'company_id' => $company->id,
+            'plan_id' => $freePlan->id,
+            'status' => 'active',
+            'starts_at' => now(),
+        ]);
+
+        SubscriptionCredits::create([
+            'subscription_id' => $subscription->id,
+            'credits_monthly' => 0,
+            'credits_available_monthly' => 0,
+            'credits_used_monthly' => 0,
+            'credits_addon_balance' => 0,
+            'credits_total_available' => 0,
+            'last_reset_date' => now(),
+        ]);
+
+        // Email should NOT be blocked by credits middleware (emails are free)
+        $response = $this->actingAs($user)->post('/feedback-requests', [
+            'customer_id' => $customer->id,
+            'channel' => 'email',
+        ]);
+
+        // Should not redirect to subscription page (credits check passed)
+        $this->assertNotEquals(
+            route('subscription.index'),
+            $response->headers->get('Location'),
+            'Free plan should be able to send emails without SMS credits'
         );
     }
 }

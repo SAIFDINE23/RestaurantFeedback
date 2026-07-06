@@ -271,6 +271,8 @@ class DashboardController extends Controller
                 'satisfaction' => $ratingTrend,
             ],
             'goals' => $goals,
+            'onboarding_completed' => ! is_null(Auth::user()->onboarding_completed_at),
+            'publicFeedbackUrl' => $company->getPublicFeedbackUrl(),
         ]);
     }
 

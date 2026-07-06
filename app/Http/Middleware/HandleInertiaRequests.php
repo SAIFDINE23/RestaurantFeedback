@@ -38,8 +38,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
             ],
             'subscription' => [
-                'plan' => $subscription?->plan->only(['id', 'name', 'slug']),
-                'features' => $subscription?->plan->features ?? [],
+                'plan' => $subscription?->plan?->only(['id', 'name', 'slug']),
+                'features' => $subscription?->plan?->features ?? [],
                 'credits' => $subscription?->credits?->only([
                     'credits_total_available',
                     'credits_available_monthly',

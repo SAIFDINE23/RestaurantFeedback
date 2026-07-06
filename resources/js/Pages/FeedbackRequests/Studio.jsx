@@ -313,7 +313,7 @@ export default function Studio({ auth, customers, templates }) {
 
                             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex gap-2">
                                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                                Les placeholders sont obligatoires pour garder les données fixes: client, entreprise, lien.
+                                Placeholders requis: SMS = client, entreprise, lien. E-mail = client, entreprise (le lien est géré par le bouton).
                             </div>
                         </form>
 

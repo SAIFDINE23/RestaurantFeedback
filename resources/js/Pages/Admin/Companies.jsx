@@ -1,28 +1,69 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 
-export default function AdminCompanies({ stats, sectorDistribution, monthlyEvolution, topCompanies, companies }) {
-    // Fonction pour formater les nombres
-    const formatNumber = (num) => {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const STATUS_MAP = {
+    active: { label: 'Actif', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+    trialing: { label: 'Essai', color: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+    past_due: { label: 'Impayé', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+    canceled: { label: 'Annulé', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+    unpaid: { label: 'Non payé', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+    none: { label: 'Aucun', color: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400' },
+};
+
+const PLAN_COLORS = {
+    free: 'bg-gray-100 text-gray-700',
+    basic: 'bg-blue-100 text-blue-700',
+    pro: 'bg-purple-100 text-purple-700',
+    enterprise: 'bg-amber-100 text-amber-700',
+};
+
+const SORT_OPTIONS = [
+    { value: 'newest', label: 'Plus récents' },
+    { value: 'oldest', label: 'Plus anciens' },
+    { value: 'name', label: 'Nom A-Z' },
+    { value: 'most_active', label: 'Plus actifs' },
+    { value: 'most_customers', label: 'Plus de clients' },
+];
+
+export default function AdminCompanies({ stats, sectorDistribution, monthlyEvolution, topCompanies, companies, filters, filterOptions }) {
+    const [search, setSearch] = useState(filters?.search || '');
+    const timerRef = useRef(null);
+
+    const fmt = (n) => (n ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+    const applyFilters = useCallback((overrides = {}) => {
+        router.get(route('admin.companies'), {
+            search: overrides.search !== undefined ? overrides.search : search,
+            status: overrides.status !== undefined ? overrides.status : filters.status,
+            plan: overrides.plan !== undefined ? overrides.plan : filters.plan,
+            sector: overrides.sector !== undefined ? overrides.sector : filters.sector,
+            sort: overrides.sort !== undefined ? overrides.sort : filters.sort,
+        }, { preserveState: true, preserveScroll: true });
+    }, [search, filters]);
+
+    const handleSearch = (e) => {
+        const value = e.target.value;
+        setSearch(value);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            applyFilters({ search: value });
+        }, 400);
     };
 
-    // Calcul du max pour le graphique
-    const maxMonthlyCount = useMemo(() => {
-        return Math.max(...monthlyEvolution.map(item => item.count), 1);
-    }, [monthlyEvolution]);
+    const resetFilters = () => {
+        setSearch('');
+        router.get(route('admin.companies'), {}, { preserveState: true, preserveScroll: true });
+    };
 
-    // Couleurs pour les secteurs
+    const hasActiveFilters = search || filters.status !== 'all' || filters.plan !== 'all' || filters.sector !== 'all' || filters.sort !== 'newest';
+
+    const maxMonthlyCount = useMemo(() => Math.max(...(monthlyEvolution || []).map(i => i.count), 1), [monthlyEvolution]);
+
     const sectorColors = [
-        'from-blue-500 to-blue-600',
-        'from-purple-500 to-purple-600',
-        'from-green-500 to-green-600',
-        'from-orange-500 to-orange-600',
-        'from-pink-500 to-pink-600',
-        'from-indigo-500 to-indigo-600',
-        'from-teal-500 to-teal-600',
-        'from-red-500 to-red-600',
+        'from-blue-500 to-blue-600', 'from-purple-500 to-purple-600', 'from-green-500 to-green-600',
+        'from-orange-500 to-orange-600', 'from-pink-500 to-pink-600', 'from-indigo-500 to-indigo-600',
+        'from-teal-500 to-teal-600', 'from-red-500 to-red-600',
     ];
 
     return (
@@ -30,377 +71,315 @@ export default function AdminCompanies({ stats, sectorDistribution, monthlyEvolu
             <Head title="Admin - Entreprises" />
             <div className="py-6">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-                    
-                    {/* KPIs Principaux */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Total Entreprises */}
-                        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-600 mb-1">Total Entreprises</p>
-                                        <p className="text-3xl font-bold text-gray-900">{formatNumber(stats.totalCompanies)}</p>
-                                        <p className="text-xs text-green-600 mt-2 font-medium flex items-center gap-1">
-                                            <span>↗</span> {stats.companiesThisMonth} ce mois
-                                        </p>
-                                    </div>
-                                    <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Entreprises Actives */}
-                        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-600 mb-1">Entreprises Actives</p>
-                                        <p className="text-3xl font-bold text-gray-900">{formatNumber(stats.activeCompanies)}</p>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            {stats.totalCompanies > 0 ? Math.round((stats.activeCompanies / stats.totalCompanies) * 100) : 0}% du total
-                                        </p>
-                                    </div>
-                                    <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Taux d'Engagement */}
-                        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-600 mb-1">Taux d'Engagement</p>
-                                        <p className="text-3xl font-bold text-gray-900">{stats.engagementRate}%</p>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            Entreprises actives
-                                        </p>
-                                    </div>
-                                    <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Croissance Mensuelle */}
-                        <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group">
-                            <div className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-600 mb-1">Croissance Mensuelle</p>
-                                        <p className={`text-3xl font-bold ${stats.monthlyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {stats.monthlyGrowth >= 0 ? '+' : ''}{stats.monthlyGrowth}%
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            vs mois dernier
-                                        </p>
-                                    </div>
-                                    <div className={`w-14 h-14 bg-gradient-to-br ${stats.monthlyGrowth >= 0 ? 'from-emerald-500 to-emerald-600' : 'from-red-500 to-red-600'} rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    {/* ═══ KPIs ═══ */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <KpiCard label="Total" value={fmt(stats.totalCompanies)} sub={`+${stats.companiesThisMonth} ce mois`} icon={<BuildingIcon />} gradient="from-blue-500 to-blue-600" />
+                        <KpiCard label="Actives" value={fmt(stats.activeCompanies)} sub={`${stats.totalCompanies > 0 ? Math.round((stats.activeCompanies / stats.totalCompanies) * 100) : 0}% du total`} icon={<CheckCircleIcon />} gradient="from-emerald-500 to-emerald-600" />
+                        <KpiCard label="Payantes" value={fmt(stats.paidCompanies)} sub="abonnements actifs" icon={<CreditCardIcon />} gradient="from-purple-500 to-purple-600" />
+                        <KpiCard label="Essai" value={fmt(stats.trialCompanies)} sub="en période d'essai" icon={<ClockIcon />} gradient="from-amber-500 to-amber-600" />
+                        <KpiCard label="Engagement" value={`${stats.engagementRate}%`} sub="ont envoyé 1+ demande" icon={<TrendUpIcon />} gradient="from-pink-500 to-pink-600" />
+                        <KpiCard label="Croissance" value={`${stats.monthlyGrowth >= 0 ? '+' : ''}${stats.monthlyGrowth}%`} sub="vs mois dernier" icon={<ChartBarIcon />} gradient={stats.monthlyGrowth >= 0 ? 'from-teal-500 to-teal-600' : 'from-red-500 to-red-600'} />
                     </div>
 
-                    {/* Métriques Secondaires */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-medium opacity-90">Clients Moyens</h3>
-                                <svg className="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold">{stats.avgCustomersPerCompany}</p>
-                                <span className="text-sm opacity-75">/ entreprise</span>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-white/20">
-                                <p className="text-xs opacity-75">{formatNumber(stats.totalCustomers)} clients au total</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-lg p-6 text-white">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-medium opacity-90">Feedbacks Moyens</h3>
-                                <svg className="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                                </svg>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold">{stats.avgFeedbacksPerCompany}</p>
-                                <span className="text-sm opacity-75">/ entreprise</span>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-white/20">
-                                <p className="text-xs opacity-75">{formatNumber(stats.totalFeedbackRequests)} demandes totales</p>
-                            </div>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-teal-400 to-cyan-500 rounded-xl shadow-lg p-6 text-white">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-sm font-medium opacity-90">Secteurs Actifs</h3>
-                                <svg className="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                            </div>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold">{sectorDistribution.length}</p>
-                                <span className="text-sm opacity-75">secteurs</span>
-                            </div>
-                            <div className="mt-4 pt-4 border-t border-white/20">
-                                <p className="text-xs opacity-75">Diversité sectorielle</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Graphiques et Répartitions */}
+                    {/* ═══ Graphiques + Secteurs ═══ */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        {/* Évolution sur 12 mois - Line Chart */}
-                        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+                        {/* Évolution 12 mois */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900">Évolution sur 12 mois</h3>
-                                    <p className="text-sm text-gray-500 mt-1">Nouvelles entreprises par mois</p>
+                                    <h3 className="text-base font-semibold text-gray-900">Évolution sur 12 mois</h3>
+                                    <p className="text-sm text-gray-500">Nouvelles inscriptions / mois</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                                    <span className="text-xs text-gray-600 font-medium">Entreprises</span>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-feedora-500"></div>
+                                    <span className="text-xs text-gray-500 font-medium">Entreprises</span>
                                 </div>
                             </div>
-                            
-                            <div className="relative">
-                                {/* Grille de fond */}
-                                <div className="absolute inset-0 flex flex-col justify-between pb-12 pr-4">
-                                    {[maxMonthlyCount, Math.floor(maxMonthlyCount * 0.75), Math.floor(maxMonthlyCount * 0.5), Math.floor(maxMonthlyCount * 0.25), 0].map((value, idx) => (
-                                        <div key={idx} className="flex items-center">
-                                            <span className="text-xs text-gray-400 w-8 text-right">{value}</span>
-                                            <div className="flex-1 border-t border-gray-100 ml-2"></div>
-                                        </div>
+                            <div className="relative h-56 ml-8">
+                                <svg className="w-full h-full" viewBox="0 0 1000 224" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="evoGrad" x1="0" x2="0" y1="0" y2="1">
+                                            <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
+                                            <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path d={`M 0,224 L ${(monthlyEvolution || []).map((item, i) => `${(i / Math.max(monthlyEvolution.length - 1, 1)) * 1000},${224 - (item.count / maxMonthlyCount) * 224}`).join(' L ')} L 1000,224 Z`} fill="url(#evoGrad)" />
+                                    <polyline points={(monthlyEvolution || []).map((item, i) => `${(i / Math.max(monthlyEvolution.length - 1, 1)) * 1000},${224 - (item.count / maxMonthlyCount) * 224}`).join(' ')} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    {(monthlyEvolution || []).map((item, i) => {
+                                        const x = (i / Math.max(monthlyEvolution.length - 1, 1)) * 1000;
+                                        const y = 224 - (item.count / maxMonthlyCount) * 224;
+                                        return <circle key={i} cx={x} cy={y} r="4" fill="white" stroke="#f97316" strokeWidth="2"><title>{item.month}: {item.count}</title></circle>;
+                                    })}
+                                </svg>
+                                <div className="absolute bottom-0 left-0 right-0 flex justify-between -mb-5">
+                                    {(monthlyEvolution || []).filter((_, i) => i % 2 === 0).map((item, i) => (
+                                        <span key={i} className="text-[10px] text-gray-400">{item.month.split(' ')[0]}</span>
                                     ))}
-                                </div>
-                                
-                                {/* Line Chart SVG */}
-                                <div className="relative h-64 ml-10">
-                                    <svg className="w-full h-full" viewBox="0 0 1000 256" preserveAspectRatio="none">
-                                        <defs>
-                                            <linearGradient id="monthlyGradient" x1="0" x2="0" y1="0" y2="1">
-                                                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                                                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-                                            </linearGradient>
-                                        </defs>
-                                        
-                                        {/* Zone sous la courbe */}
-                                        <path
-                                            d={(() => {
-                                                const points = monthlyEvolution.map((item, index) => {
-                                                    const x = (index / (monthlyEvolution.length - 1)) * 1000;
-                                                    const y = 256 - (maxMonthlyCount > 0 ? (item.count / maxMonthlyCount) * 256 : 0);
-                                                    return `${x},${y}`;
-                                                });
-                                                return `M 0,256 L ${points.join(' L ')} L 1000,256 Z`;
-                                            })()}
-                                            fill="url(#monthlyGradient)"
-                                        />
-                                        
-                                        {/* Ligne principale */}
-                                        <polyline
-                                            points={monthlyEvolution.map((item, index) => {
-                                                const x = (index / (monthlyEvolution.length - 1)) * 1000;
-                                                const y = 256 - (maxMonthlyCount > 0 ? (item.count / maxMonthlyCount) * 256 : 0);
-                                                return `${x},${y}`;
-                                            }).join(' ')}
-                                            fill="none"
-                                            stroke="#3b82f6"
-                                            strokeWidth="3"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="drop-shadow-lg"
-                                        />
-                                        
-                                        {/* Points */}
-                                        {monthlyEvolution.map((item, index) => {
-                                            const x = (index / (monthlyEvolution.length - 1)) * 1000;
-                                            const y = 256 - (maxMonthlyCount > 0 ? (item.count / maxMonthlyCount) * 256 : 0);
-                                            
-                                            return (
-                                                <g key={index}>
-                                                    <circle
-                                                        cx={x}
-                                                        cy={y}
-                                                        r="5"
-                                                        fill="white"
-                                                        stroke="#3b82f6"
-                                                        strokeWidth="2"
-                                                        className="opacity-0 hover:opacity-100 transition-opacity cursor-pointer drop-shadow-md"
-                                                    />
-                                                    <circle cx={x} cy={y} r="8" fill="transparent" className="cursor-pointer">
-                                                        <title>{item.month}: {item.count} entreprise{item.count > 1 ? 's' : ''}</title>
-                                                    </circle>
-                                                </g>
-                                            );
-                                        })}
-                                    </svg>
-                                    
-                                    {/* Labels mois */}
-                                    <div className="absolute bottom-0 left-0 right-0 flex justify-between mt-2 px-1">
-                                        {monthlyEvolution.map((item, index) => {
-                                            if (index % 2 !== 0) return null;
-                                            return (
-                                                <span key={index} className="text-xs text-gray-500 font-medium">
-                                                    {item.month}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Répartition par secteur */}
-                        <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-6">Répartition par secteur</h3>
-                            <div className="space-y-4">
-                                {sectorDistribution.slice(0, 8).map((sector, index) => {
-                                    const percentage = stats.totalCompanies > 0 
-                                        ? (sector.count / stats.totalCompanies) * 100 
-                                        : 0;
-                                    
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="text-base font-semibold text-gray-900 mb-5">Répartition par secteur</h3>
+                            <div className="space-y-3">
+                                {(sectorDistribution || []).slice(0, 6).map((sector, i) => {
+                                    const pct = stats.totalCompanies > 0 ? (sector.count / stats.totalCompanies) * 100 : 0;
                                     return (
-                                        <div key={index} className="space-y-2">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="font-medium text-gray-700 truncate max-w-[200px]">
-                                                    {sector.sector || 'Non spécifié'}
-                                                </span>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-gray-600 font-medium">{sector.count}</span>
-                                                    <span className="text-gray-500 w-12 text-right">{percentage.toFixed(1)}%</span>
+                                        <div key={i}>
+                                            <div className="flex items-center justify-between text-sm mb-1">
+                                                <span className="font-medium text-gray-700 truncate max-w-[200px]">{sector.sector || 'Non spécifié'}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-600 font-semibold">{sector.count}</span>
+                                                    <span className="text-gray-400 w-10 text-right text-xs">{pct.toFixed(0)}%</span>
                                                 </div>
                                             </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${sectorColors[index % sectorColors.length]}`}
-                                                    style={{ width: `${percentage}%` }}
-                                                />
+                                            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                                                <div className={`h-full rounded-full bg-gradient-to-r ${sectorColors[i % sectorColors.length]} transition-all duration-500`} style={{ width: `${pct}%` }} />
                                             </div>
                                         </div>
                                     );
                                 })}
+                                {(!sectorDistribution || sectorDistribution.length === 0) && (
+                                    <p className="text-sm text-gray-400 py-4 text-center">Aucun secteur enregistré</p>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Top 5 Entreprises */}
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Top 5 Entreprises les plus actives</h3>
-                        <div className="space-y-4">
-                            {topCompanies.map((company, index) => (
-                                <div key={company.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg ${
-                                        index === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-500' :
-                                        index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
-                                        index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
+                    {/* ═══ Top 5 ═══ */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                        <h3 className="text-base font-semibold text-gray-900 mb-4">Top 5 — Entreprises les plus actives</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                            {(topCompanies || []).map((company, i) => (
+                                <div key={company.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0 ${
+                                        i === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-500' :
+                                        i === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
+                                        i === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700' :
                                         'bg-gradient-to-br from-blue-500 to-blue-600'
                                     }`}>
-                                        {index + 1}
+                                        {i + 1}
                                     </div>
-                                    <div className="flex-1">
-                                        <h4 className="font-semibold text-gray-900">{company.name}</h4>
-                                        <p className="text-sm text-gray-500">{company.sector || 'Secteur non spécifié'}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-semibold text-gray-900">{company.feedbacks} demandes</p>
-                                        <p className="text-xs text-gray-500">{company.customers} clients</p>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{company.name}</p>
+                                        <p className="text-xs text-gray-500">{company.feedbacks} demandes · {company.customers} clients</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Liste complète des entreprises */}
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                            <h3 className="text-lg font-semibold text-gray-900">Toutes les entreprises</h3>
-                            <p className="text-sm text-gray-600 mt-1">{companies.length} entreprise{companies.length > 1 ? 's' : ''} au total</p>
+                    {/* ═══ Filtres + Tableau ═══ */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        {/* Toolbar */}
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                                {/* Search */}
+                                <div className="relative flex-1 max-w-md">
+                                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        value={search}
+                                        onChange={handleSearch}
+                                        placeholder="Rechercher entreprise, email, secteur..."
+                                        className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-feedora-500/20 focus:border-feedora-500 transition-colors"
+                                    />
+                                </div>
+
+                                {/* Filters */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <select value={filters.status} onChange={(e) => applyFilters({ status: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-feedora-500/20 focus:border-feedora-500">
+                                        <option value="all">Tous les statuts</option>
+                                        <option value="active">Actifs</option>
+                                        <option value="trial">En essai</option>
+                                        <option value="inactive">Inactifs</option>
+                                    </select>
+
+                                    <select value={filters.plan} onChange={(e) => applyFilters({ plan: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-feedora-500/20 focus:border-feedora-500">
+                                        <option value="all">Tous les plans</option>
+                                        {(filterOptions?.plans || []).map(p => (
+                                            <option key={p.slug} value={p.slug}>{p.name}</option>
+                                        ))}
+                                    </select>
+
+                                    <select value={filters.sector} onChange={(e) => applyFilters({ sector: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-feedora-500/20 focus:border-feedora-500">
+                                        <option value="all">Tous les secteurs</option>
+                                        {(filterOptions?.sectors || []).map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+
+                                    <select value={filters.sort} onChange={(e) => applyFilters({ sort: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-feedora-500/20 focus:border-feedora-500">
+                                        {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+
+                                    {hasActiveFilters && (
+                                        <button onClick={resetFilters} className="text-xs text-feedora-600 hover:text-feedora-700 font-medium px-2 py-1 rounded hover:bg-feedora-50 transition-colors">
+                                            ✕ Réinitialiser
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                                <span>{fmt(companies?.total ?? 0)} entreprise{(companies?.total ?? 0) > 1 ? 's' : ''}</span>
+                                {hasActiveFilters && <span className="text-feedora-600 font-medium">(filtré)</span>}
+                            </div>
                         </div>
+
+                        {/* Table */}
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entreprise</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Secteur</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Propriétaire</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clients</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feedbacks</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Créé le</th>
+                            <table className="min-w-full divide-y divide-gray-100">
+                                <thead>
+                                    <tr className="text-left">
+                                        <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Entreprise</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Secteur</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Statut</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Clients</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Feedbacks</th>
+                                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Créé le</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {companies.map((company) => (
-                                        <tr key={company.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    {company.logo_url ? (
-                                                        <img src={`/storage/${company.logo_url}`} alt={company.name} className="w-8 h-8 rounded-full mr-3 object-cover" />
-                                                    ) : (
-                                                        <div className="w-8 h-8 rounded-full mr-3 bg-gray-300 flex items-center justify-center text-gray-600 font-semibold text-sm">
-                                                            {company.name.charAt(0).toUpperCase()}
+                                <tbody className="divide-y divide-gray-50">
+                                    {(companies?.data || []).map((company) => {
+                                        const st = STATUS_MAP[company.subscription_status] || STATUS_MAP.none;
+                                        const planColor = PLAN_COLORS[company.plan_slug] || 'bg-gray-100 text-gray-600';
+                                        return (
+                                            <tr key={company.id} className="hover:bg-gray-50/50 transition-colors">
+                                                <td className="px-6 py-3.5">
+                                                    <div className="flex items-center gap-3">
+                                                        {company.logo_url ? (
+                                                            <img src={`/storage/${company.logo_url}`} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-100" />
+                                                        ) : (
+                                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-feedora-400 to-feedora-600 flex items-center justify-center text-white font-bold text-sm ring-2 ring-feedora-100">
+                                                                {company.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900 truncate max-w-[200px]">{company.name}</p>
+                                                            <p className="text-xs text-gray-500 truncate max-w-[200px]">{company.user_email}</p>
                                                         </div>
-                                                    )}
-                                                    <span className="text-sm font-medium text-gray-900">{company.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <span className="text-sm text-gray-600">{company.sector || '—'}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${planColor}`}>
+                                                        {company.plan_name}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${st.color}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`}></span>
+                                                        {st.label}
+                                                        {company.is_trial && company.trial_ends_at && (
+                                                            <span className="text-[10px] opacity-75 ml-1">→ {company.trial_ends_at}</span>
+                                                        )}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <span className="text-sm font-medium text-gray-700">{company.customers_count}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <span className="text-sm font-medium text-gray-700">{company.feedback_requests_count}</span>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <span className="text-sm text-gray-500">{company.created_at}</span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {(companies?.data || []).length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="px-6 py-12 text-center">
+                                                <div className="text-gray-400">
+                                                    <BuildingIcon className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                                                    <p className="text-sm font-medium">Aucune entreprise trouvée</p>
+                                                    <p className="text-xs mt-1">Essayez de modifier vos filtres</p>
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {company.sector || '-'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm">
-                                                    <div className="font-medium text-gray-900">{company.user_name}</div>
-                                                    <div className="text-gray-500">{company.user_email}</div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {company.customers_count}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {company.feedback_requests_count}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                    company.is_active 
-                                                        ? 'bg-green-100 text-green-800' 
-                                                        : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                    {company.is_active ? 'Actif' : 'Inactif'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {company.created_at}
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination */}
+                        {companies?.links && companies.links.length > 3 && (
+                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                                <p className="text-xs text-gray-500">
+                                    {companies.from}–{companies.to} sur {companies.total}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    {companies.links.map((link, i) => (
+                                        <Link
+                                            key={i}
+                                            href={link.url || '#'}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                link.active
+                                                    ? 'bg-feedora-500 text-white shadow-sm'
+                                                    : link.url
+                                                        ? 'text-gray-600 hover:bg-gray-100'
+                                                        : 'text-gray-300 cursor-not-allowed'
+                                            }`}
+                                            preserveScroll
+                                            preserveState
+                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                 </div>
             </div>
         </AdminLayout>
     );
+}
+
+/* ═══ Sub-components ═══ */
+
+function KpiCard({ label, value, sub, icon, gradient }) {
+    return (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow group">
+            <div className="flex items-start justify-between mb-3">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform`}>
+                    <span className="text-white">{icon}</span>
+                </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
+            <p className="text-xs font-medium text-gray-500 mt-1">{label}</p>
+            {sub && <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>}
+        </div>
+    );
+}
+
+/* ═══ Icons ═══ */
+
+function SearchIcon({ className }) {
+    return <svg className={className || 'w-5 h-5'} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>;
+}
+function BuildingIcon({ className }) {
+    return <svg className={className || 'w-5 h-5'} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>;
+}
+function CheckCircleIcon() {
+    return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+}
+function CreditCardIcon() {
+    return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>;
+}
+function ClockIcon() {
+    return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+}
+function TrendUpIcon() {
+    return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+}
+function ChartBarIcon() {
+    return <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 13v4m4-8v8m4-12v12" /></svg>;
 }

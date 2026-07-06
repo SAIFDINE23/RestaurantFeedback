@@ -40,8 +40,14 @@ class FeedbackRequestController extends Controller
             'qr_template' => ['nullable', 'string', 'max:500'],
         ]);
 
-        foreach (['sms_template', 'email_subject_template', 'email_body_template'] as $field) {
-            foreach (FeedbackTemplateService::TOKENS as $token) {
+        $requiredTokens = [
+            'sms_template' => ['{{customer_name}}', '{{company_name}}', '{{feedback_link}}'],
+            'email_subject_template' => ['{{company_name}}'],
+            'email_body_template' => ['{{customer_name}}', '{{company_name}}'],
+        ];
+
+        foreach ($requiredTokens as $field => $tokens) {
+            foreach ($tokens as $token) {
                 if (!str_contains($data[$field], $token)) {
                     return back()->withErrors([
                         $field => "Le champ doit contenir le placeholder {$token}",
@@ -135,6 +141,7 @@ class FeedbackRequestController extends Controller
                 $variables = $this->templateVariables($feedbackRequest, $link);
                 $subject = $templateService->render($templates['email_subject_template'], $variables);
                 $emailBody = $templateService->render($templates['email_body_template'], $variables);
+                $emailBody = $this->sanitizeEmailBody($emailBody, $variables['{{feedback_link}}']);
                 
                 $htmlContent = view('emails.feedback-request-custom', [
                     'customerName' => $feedbackRequest->customer->name,
@@ -335,6 +342,7 @@ class FeedbackRequestController extends Controller
 
                         $subject = $templateService->render($templates['email_subject_template'], $variables);
                         $emailBody = $templateService->render($templates['email_body_template'], $variables);
+                        $emailBody = $this->sanitizeEmailBody($emailBody, $variables['{{feedback_link}}']);
 
                         $htmlContent = view('emails.feedback-request-custom', [
                             'customerName' => $feedbackRequest->customer->name,
@@ -465,6 +473,26 @@ class FeedbackRequestController extends Controller
             '{{company_name}}' => $feedbackRequest->company->name ?: 'notre équipe',
             '{{feedback_link}}' => $link,
         ];
+    }
+
+    private function sanitizeEmailBody(string $emailBody, string $feedbackLink): string
+    {
+        $escapedLink = preg_quote($feedbackLink, '/');
+
+        // Supprimer le lien complet injecté par placeholder
+        $emailBody = preg_replace('/^\s*' . $escapedLink . '\s*$/mi', '', $emailBody) ?? $emailBody;
+
+        // Supprimer les URLs /feedback/... visibles dans le texte
+        $emailBody = preg_replace('/https?:\/\/[^\s]*\/feedback\/[A-Za-z0-9\-]+/i', '', $emailBody) ?? $emailBody;
+        $emailBody = preg_replace('/\/?feedback\/[A-Za-z0-9\-]+/i', '', $emailBody) ?? $emailBody;
+
+        // Nettoyer les placeholders restants éventuels
+        $emailBody = str_replace('{{feedback_link}}', '', $emailBody);
+
+        // Normaliser les sauts de ligne (max 2 consécutifs)
+        $emailBody = preg_replace("/\n{3,}/", "\n\n", $emailBody) ?? $emailBody;
+
+        return trim($emailBody);
     }
 
     /**
