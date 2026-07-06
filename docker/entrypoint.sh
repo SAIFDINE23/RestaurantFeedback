@@ -31,9 +31,14 @@ fi
 echo "Optimisation de Laravel..."
 php /app/artisan migrate --force --no-interaction || echo "⚠️ Migrations déjà faites ou erreur"
 php /app/artisan storage:link || true
-php /app/artisan config:clear
-php /app/artisan route:clear
-php /app/artisan view:clear
+
+# INFRA-04 : caches de production (perf). Vérifié : aucun appel env() hors config/,
+# donc config:cache est sûr. route:cache fonctionne malgré les closures (Laravel 11
+# sérialise les closures via SerializableClosure) — validé.
+php /app/artisan config:cache
+php /app/artisan event:cache
+php /app/artisan route:cache
+php /app/artisan view:cache
 
 # Fix final des permissions avant le lancement
 chown -R www-data:www-data /app/storage /app/bootstrap/cache
