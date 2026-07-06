@@ -351,8 +351,11 @@ Route::middleware(['auth', 'verified', IsAdmin::class])->prefix('admin')->name('
 |--------------------------------------------------------------------------
 | Test routes - Brevo Email & SMS
 |--------------------------------------------------------------------------
+| RF-01 : réservées aux admins plateforme — ces endpoints déclenchent de
+| vrais envois SMS/email payants et ne doivent pas être accessibles aux
+| utilisateurs standards.
 */
-Route::middleware(['auth', 'verified'])->prefix('test-brevo')->name('test-brevo.')->group(function () {
+Route::middleware(['auth', 'verified', IsAdmin::class])->prefix('test-brevo')->name('test-brevo.')->group(function () {
     Route::post('/email', [\App\Http\Controllers\TestBrevoController::class, 'testEmail'])->name('email');
     Route::post('/sms', [\App\Http\Controllers\TestBrevoController::class, 'testSMS'])->name('sms');
     Route::get('/config', [\App\Http\Controllers\TestBrevoController::class, 'checkConfiguration'])->name('config');
