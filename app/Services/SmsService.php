@@ -10,45 +10,56 @@ class SmsService
 {
     /**
      * Vérifier et envoyer un SMS avec consommation de crédits
-     * 
-     * @param string $to Numéro de téléphone
-     * @param string $message Contenu du message
-     * @param Subscription|null $subscription La subscription de la company (optionnel)
-     * @return array
+     *
+     * @param  string  $to  Numéro de téléphone
+     * @param  string  $message  Contenu du message
+     * @param  Subscription|null  $subscription  La subscription de la company (optionnel)
+     *
      * @throws \RuntimeException Si crédits insuffisants ou erreur Brevo
      */
     public function sendWithCredits(string $to, string $message, ?Subscription $subscription = null): array
     {
         // Si pas de subscription, on envoie simplement (backward compatible)
-        if (!$subscription) {
+        if (! $subscription) {
             return $this->send($to, $message);
         }
 
         // 1️⃣ Vérifier les crédits disponibles
         $creditService = app(\App\Services\CreditConsumptionService::class);
-        
+
         // Extraire le code pays du numéro (approx)
         $countryCode = $this->extractCountryCode($to);
-        
-        if (!$creditService->canSendSms($subscription, $countryCode, 1)) {
-            throw new \RuntimeException(
-                'Crédits insuffisants pour envoyer ce SMS. ' .
-                'Disponible: ' . $subscription->credits->credits_total_available . ' unités'
-            );
+
+        // canSendSms() renvoie un tableau ['can_send' => bool, ...] : il FAUT tester
+        // la clé, sinon la condition est toujours fausse (tableau non vide = truthy)
+        // et le contrôle de crédits ne bloque jamais (fuite de revenus).
+        $check = $creditService->canSendSms($subscription, $countryCode, 1);
+        if (! ($check['can_send'] ?? false)) {
+            throw new \RuntimeException($check['message'] ?? 'Crédits insuffisants pour envoyer ce SMS.');
         }
 
         // 2️⃣ Envoyer le SMS
         $result = $this->send($to, $message);
 
-        // 3️⃣ Consommer les crédits
+        // 3️⃣ Consommer les crédits (le SMS est déjà parti : ne jamais bloquer la réponse)
         try {
-            $creditService->consumeCreditsForSms($subscription, $countryCode, 1);
-            
-            Log::info('SMS envoyé et crédits consommés', [
-                'subscription_id' => $subscription->id,
-                'country_code' => $countryCode,
-                'message_id' => $result['messageId'] ?? null,
-            ]);
+            $consumption = $creditService->consumeCreditsForSms($subscription, $countryCode);
+
+            if (! ($consumption['success'] ?? false)) {
+                Log::error('SMS envoyé mais consommation des crédits échouée', [
+                    'subscription_id' => $subscription->id,
+                    'country_code' => $countryCode,
+                    'message_id' => $result['messageId'] ?? null,
+                    'reason' => $consumption['message'] ?? 'unknown',
+                ]);
+            } else {
+                Log::info('SMS envoyé et crédits consommés', [
+                    'subscription_id' => $subscription->id,
+                    'country_code' => $countryCode,
+                    'units_consumed' => $consumption['units_consumed'] ?? null,
+                    'message_id' => $result['messageId'] ?? null,
+                ]);
+            }
         } catch (\Exception $e) {
             // Log l'erreur mais ne bloque pas (SMS déjà envoyé)
             Log::error('Erreur lors de la consommation des crédits', [
@@ -85,8 +96,8 @@ class SmsService
             'type' => 'transactional',
         ]);
 
-        if (!$response->successful()) {
-            throw new \RuntimeException('Brevo SMS error: ' . $response->body());
+        if (! $response->successful()) {
+            throw new \RuntimeException('Brevo SMS error: '.$response->body());
         }
 
         return [
@@ -103,7 +114,7 @@ class SmsService
     private function extractCountryCode(string $phone): string
     {
         $phone = $this->normalizePhoneNumber($phone);
-        
+
         // Mappings pays courants
         $countryMap = [
             '+33' => 'FR',  // France
@@ -126,14 +137,14 @@ class SmsService
             '+420' => 'CZ', // Tchéquie
             '+36' => 'HU',  // Hongrie
         ];
-        
+
         // Chercher le code pays le plus long en match
         foreach ($countryMap as $prefix => $code) {
             if (str_starts_with($phone, $prefix)) {
                 return $code;
             }
         }
-        
+
         // Default: FR si on ne reconnaît pas
         return 'FR';
     }
